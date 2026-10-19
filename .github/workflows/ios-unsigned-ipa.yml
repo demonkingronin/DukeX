@@ -1,0 +1,120 @@
+name: Build DukeX iOS (unsigned IPA)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/ios-unsigned-ipa
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    name: Compile iOS app and package unsigned IPA
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - name: Checkout DukeX source
+        uses: actions/checkout@v4
+
+      - name: Check macOS and Xcode
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+          test -f ios/DukeX/DukeX.xcodeproj/project.pbxproj
+
+      # The aspect-ratio feature changes the Swift app, not the emulation core.
+      # Reuse only the three runtime libraries from the version-matched
+      # official DukeX release. Verify the published package checksum.
+      - name: Obtain verified upstream iOS runtime libraries
+        shell: bash
+        env:
+          ORIGINAL_IPA: https://github.com/MaftyManicEMU/DukeX/releases/download/v1.0.2/DukeX.v1.0.2.ipa
+          ORIGINAL_SHA256: 06565826bc2279e9201d6ffd883c9947e7df97c96a9421f9fba7748e6628d63b
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/dukex-upstream"
+          curl --fail --location --retry 3 --retry-delay 3 \
+            "$ORIGINAL_IPA" -o "$RUNNER_TEMP/dukex-upstream/release.ipa"
+          echo "$ORIGINAL_SHA256  $RUNNER_TEMP/dukex-upstream/release.ipa" \
+            | shasum --algorithm 256 --check
+          unzip -q "$RUNNER_TEMP/dukex-upstream/release.ipa" \
+            -d "$RUNNER_TEMP/dukex-upstream/extracted"
+          UPSTREAM_APP="$(find "$RUNNER_TEMP/dukex-upstream/extracted/Payload" \
+            -maxdepth 1 -name '*.app' -type d -print -quit)"
+          if [ -z "$UPSTREAM_APP" ]; then
+            echo "::error::Official IPA does not contain Payload/*.app"
+            exit 1
+          fi
+          UPSTREAM_FRAMEWORKS="$UPSTREAM_APP/Frameworks"
+          CORE="$UPSTREAM_FRAMEWORKS/libxemu-ios-core.dylib"
+          SLIRP="$UPSTREAM_FRAMEWORKS/libslirp.0.dylib"
+          MOLTENVK="$UPSTREAM_FRAMEWORKS/MoltenVK.framework"
+          for file in "$CORE" "$SLIRP" "$MOLTENVK/MoltenVK"; do
+            if [ ! -f "$file" ]; then
+              echo "::error::Missing upstream dependency: $file"
+              exit 1
+            fi
+          done
+          mkdir -p build-ios-arm64/subprojects/slirp
+          cp "$CORE" build-ios-arm64/libxemu-ios-core.dylib
+          cp "$SLIRP" build-ios-arm64/subprojects/slirp/libslirp.0.dylib
+          echo "MOLTENVK_FRAMEWORK=$MOLTENVK" >> "$GITHUB_ENV"
+          echo "Bundled verified official DukeX v1.0.2 runtime libraries."
+
+      - name: Compile forked Swift app
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ios/DukeX/DukeX.xcodeproj \
+            -scheme DukeX \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/dukex-derived-data" \
+            PRODUCT_BUNDLE_IDENTIFIER=com.demonkingronin.dukex \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build 2>&1 | tee "$RUNNER_TEMP/dukex-xcodebuild.log"
+
+      - name: Package unsigned test IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="$RUNNER_TEMP/dukex-derived-data/Build/Products/Release-iphoneos/DukeX.app"
+          test -f "$APP/DukeX"
+          test -f "$APP/Frameworks/libxemu-ios-core.dylib"
+          test -f "$APP/Frameworks/libslirp.0.dylib"
+          test -f "$APP/Frameworks/MoltenVK.framework/MoltenVK"
+          BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")"
+          if [ "$BUNDLE_ID" != "com.demonkingronin.dukex" ]; then
+            echo "::error::Unexpected bundle identifier: $BUNDLE_ID"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/dukex-package/Payload"
+          /usr/bin/ditto "$APP" "$RUNNER_TEMP/dukex-package/Payload/DukeX.app"
+          (
+            cd "$RUNNER_TEMP/dukex-package"
+            COPYFILE_DISABLE=1 zip -q -r -X \
+              "$GITHUB_WORKSPACE/DukeX-16x9-unsigned.ipa" Payload
+          )
+          unzip -t "$GITHUB_WORKSPACE/DukeX-16x9-unsigned.ipa" | tail -n 1
+
+      - name: Upload test IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: DukeX-16x9-unsigned-IPA
+          path: DukeX-16x9-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload compiler log if build fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: DukeX-iOS-build-log
+          path: ${{ runner.temp }}/dukex-xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7
