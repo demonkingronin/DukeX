@@ -46,6 +46,27 @@ struct SettingsView: View {
             .dukeXThemedListRowBackground()
 
             Section("Display") {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Aspect Ratio", systemImage: "rectangle.expand.vertical")
+                    Text("Choose how the game image is displayed. Changes apply when you next launch a game.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Picker(selection: $store.gameDisplayAspectRatio) {
+                    ForEach(GameDisplayAspectRatio.allCases) { aspectRatio in
+                        Text(aspectRatio.title).tag(aspectRatio)
+                    }
+                } label: {
+                    Text("Aspect Ratio")
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+
+                Text(store.gameDisplayAspectRatio.detail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+
                 Toggle(isOn: $store.metalHUDEnabled) {
                     Label("Metal HUD", systemImage: "gauge.with.dots.needle.67percent")
                 }

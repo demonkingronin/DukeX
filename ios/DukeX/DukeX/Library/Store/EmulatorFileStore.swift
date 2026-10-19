@@ -65,6 +65,11 @@ final class EmulatorFileStore: ObservableObject {
             UserDefaults.standard.set(presentPacingMode.rawValue, forKey: PresentPacingMode.defaultsKey)
         }
     }
+    @Published var gameDisplayAspectRatio: GameDisplayAspectRatio {
+        didSet {
+            UserDefaults.standard.set(gameDisplayAspectRatio.rawValue, forKey: GameDisplayAspectRatio.defaultsKey)
+        }
+    }
     @Published var metalHUDEnabled: Bool {
         didSet {
             UserDefaults.standard.set(metalHUDEnabled, forKey: Self.metalHUDEnabledKey)
@@ -342,6 +347,7 @@ final class EmulatorFileStore: ObservableObject {
         autoJITBeforeLaunchEnabled = UserDefaults.standard.object(forKey: Self.autoJITBeforeLaunchKey) as? Bool ?? true
         autoLaunchDashboardOnOpenEnabled = UserDefaults.standard.object(forKey: Self.autoLaunchDashboardOnOpenKey) as? Bool ?? false
         presentPacingMode = PresentPacingMode.current
+        gameDisplayAspectRatio = GameDisplayAspectRatio.current
         metalHUDEnabled = UserDefaults.standard.object(forKey: Self.metalHUDEnabledKey) as? Bool ?? false
         forceThirtyFPSLockEnabled = UserDefaults.standard.object(forKey: Self.forceThirtyFPSLockEnabledKey) as? Bool ?? false
         depthClampEnabled = UserDefaults.standard.object(forKey: Self.depthClampEnabledKey) as? Bool ?? true

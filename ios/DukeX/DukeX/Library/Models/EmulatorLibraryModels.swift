@@ -608,6 +608,41 @@ struct NetworkSettings {
     }
 }
 
+enum GameDisplayAspectRatio: String, CaseIterable, Identifiable {
+    case automatic = "auto"
+    case fourByThree = "4:3"
+    case sixteenByNine = "16:9"
+
+    var id: String { rawValue }
+
+    static let defaultsKey = "DukeXGameDisplayAspectRatio"
+
+    static var current: GameDisplayAspectRatio {
+        let value = UserDefaults.standard.string(forKey: defaultsKey)
+            ?? GameDisplayAspectRatio.automatic.rawValue
+        return GameDisplayAspectRatio(rawValue: value) ?? .automatic
+    }
+
+    var title: String {
+        switch self {
+        case .automatic: return "Auto"
+        case .fourByThree: return "4:3"
+        case .sixteenByNine: return "16:9"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .automatic:
+            return "Follow the game's reported Xbox aspect ratio."
+        case .fourByThree:
+            return "Display games at 4:3, regardless of their reported mode."
+        case .sixteenByNine:
+            return "Display games at 16:9. Games without widescreen support may look stretched."
+        }
+    }
+}
+
 enum PresentPacingMode: String, CaseIterable, Identifiable {
     case speed
     case smooth
