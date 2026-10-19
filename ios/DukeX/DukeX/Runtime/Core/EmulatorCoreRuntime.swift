@@ -556,8 +556,11 @@ final class EmulatorCoreRuntime: ObservableObject {
     ) -> Int32 {
         MetalDiagnostics.configurePerformanceHUD()
         let bundleIdentifier = Bundle.main.bundleIdentifier?.lowercased() ?? ""
-        let useVulkanSwapchain = bundleIdentifier.hasPrefix("com.mafty.dukex")
+        let useVulkanSwapchain =
+            bundleIdentifier.hasPrefix("com.mafty.dukex") ||
+            bundleIdentifier.hasPrefix("com.demonkingronin.dukex")
         let presentPacingMode = PresentPacingMode.current
+        let gameDisplayAspectRatio = GameDisplayAspectRatio.current
         let forceThirtyFPSLock =
             UserDefaults.standard.object(forKey: EmulatorFileStore.forceThirtyFPSLockEnabledKey) as? Bool ?? false
         let depthClampEnabled =
@@ -581,7 +584,7 @@ final class EmulatorCoreRuntime: ObservableObject {
             ("XEMU_IOS_PRESENTER_LANDSCAPE_SCALE", "1.0"),
             ("XEMU_IOS_PRESENTER_LANDSCAPE_ALIGN_X", "0.5"),
             ("XEMU_IOS_PRESENTER_LANDSCAPE_ALIGN_Y", "0.5"),
-            ("XEMU_IOS_PRESENTER_ASPECT", "auto"),
+            ("XEMU_IOS_PRESENTER_ASPECT", gameDisplayAspectRatio.rawValue),
             ("XEMU_IOS_PRESENTER_LINEAR_FILTER", "1"),
             ("XEMU_IOS_PRESENTER_FLIP_X", "0"),
             ("XEMU_IOS_PRESENTER_FLIP_Y", "1"),
