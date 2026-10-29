@@ -79,6 +79,7 @@ final class ManicSkinTouchControlsView: UIView {
             touchControlsActive = false
             isHidden = true
             isUserInteractionEnabled = false
+            controllerBridge.setPhysicalControllerInputEnabled(false)
             controllerBridge.setTouchControlsActive(false)
             onTouchControlsModeChanged?(false)
             notifyViewportChanged()
@@ -379,12 +380,17 @@ final class ManicSkinTouchControlsView: UIView {
         isHidden = !shouldUseTouchControls
         isUserInteractionEnabled = shouldUseTouchControls
         if shouldUseTouchControls {
+            // Keep port 1 alive while handing the game back to touch.
             if modeChanged {
                 controllerBridge.setTouchControlsActive(true)
                 NSLog("Manic skin touch controls shown (%@)", reason)
             }
+            controllerBridge.setPhysicalControllerInputEnabled(false)
         } else {
             releaseAllTouches()
+            // SDL may miss mid-game hotplug. Forward physical input through
+            // the existing native Xbox controller bridge.
+            controllerBridge.setPhysicalControllerInputEnabled(true)
             if modeChanged {
                 controllerBridge.setTouchControlsActive(false)
                 NSLog("Manic skin touch controls hidden because a physical controller is connected (%@)", reason)
