@@ -97,6 +97,20 @@ final class ManicSkinVirtualControllerBridge {
     private var rightThumbstick = CGPoint.zero
     private var didLogMissingCoreSymbol = false
     private let publishesToCore: Bool
+    private weak var physicalController: GCController?
+    private var physicalPollTimer: Timer?
+    private var lastPublishedState: CoreInputState?
+
+    private struct CoreInputState: Equatable {
+        var active: Bool
+        var buttons: UInt32
+        var leftTrigger: Int16
+        var rightTrigger: Int16
+        var leftX: Int16
+        var leftY: Int16
+        var rightX: Int16
+        var rightY: Int16
+    }
 
     init(publishesToCore: Bool = true) {
         self.publishesToCore = publishesToCore
@@ -122,6 +136,54 @@ final class ManicSkinVirtualControllerBridge {
 
     func isManagedVirtualController(_ controller: GCController) -> Bool {
         false
+    }
+
+    // SDL and UIKit both observe controllers. Polling does not override
+    // SDL's own GameController valueChangedHandler.
+    func setPhysicalControllerInputEnabled(_ enabled: Bool) {
+        guard publishesToCore else { return }
+        let nextController = enabled ? connectedPhysicalController() : nil
+        let changed = physicalController !== nextController
+        physicalController = nextController
+
+        if let nextController {
+            if physicalPollTimer == nil {
+                let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+                    self?.pollPhysicalController()
+                }
+                RunLoop.main.add(timer, forMode: .common)
+                physicalPollTimer = timer
+            }
+            if changed {
+                NativeMetalDiagnostics.log(
+                    "PHYSICAL_INPUT",
+                    "attached=1 device=\(nextController.vendorName ?? "unknown")"
+                )
+            }
+        } else {
+            physicalPollTimer?.invalidate()
+            physicalPollTimer = nil
+            if changed {
+                NativeMetalDiagnostics.log("PHYSICAL_INPUT", "attached=0")
+            }
+        }
+        publishState()
+    }
+
+    private func connectedPhysicalController() -> GCController? {
+        GCController.controllers().first { controller in
+            !isVirtualController(controller) &&
+                (controller.extendedGamepad != nil || controller.microGamepad != nil)
+        }
+    }
+
+    private func pollPhysicalController() {
+        let connected = connectedPhysicalController()
+        if connected !== physicalController {
+            setPhysicalControllerInputEnabled(true)
+        } else {
+            publishState()
+        }
     }
 
     func setButtonInput(_ input: String, pressed: Bool) {
@@ -199,33 +261,87 @@ final class ManicSkinVirtualControllerBridge {
     }
 
     private func publishState() {
-        guard publishesToCore else {
-            return
-        }
+        guard publishesToCore else { return }
+        let state = physicalController.map(physicalState) ?? CoreInputState(
+            active: touchControlsActive,
+            buttons: currentButtons,
+            leftTrigger: leftTrigger,
+            rightTrigger: rightTrigger,
+            leftX: axisValue(leftThumbstick.x),
+            leftY: axisValue(leftThumbstick.y),
+            rightX: axisValue(rightThumbstick.x),
+            rightY: axisValue(rightThumbstick.y)
+        )
+        guard state != lastPublishedState,
+              let setter = resolveSetTouchControllerState() else { return }
 
-        guard let setter = resolveSetTouchControllerState() else {
-            return
-        }
-
-        let buttons = currentButtons
-        let leftX = axisValue(leftThumbstick.x)
-        let leftY = axisValue(leftThumbstick.y)
-        let rightX = axisValue(rightThumbstick.x)
-        let rightY = axisValue(rightThumbstick.y)
+        lastPublishedState = state
         NativeMetalDiagnostics.log(
             "TOUCH_BRIDGE_STATE",
-            "active=\(touchControlsActive ? 1 : 0) buttons=0x\(String(buttons, radix: 16)) lt=\(leftTrigger) rt=\(rightTrigger) lx=\(leftX) ly=\(leftY) rx=\(rightX) ry=\(rightY)"
+            "source=\(physicalController == nil ? "touch" : "physical") active=\(state.active ? 1 : 0) buttons=0x\(String(state.buttons, radix: 16)) lt=\(state.leftTrigger) rt=\(state.rightTrigger) lx=\(state.leftX) ly=\(state.leftY) rx=\(state.rightX) ry=\(state.rightY)"
         )
         setter(
-            touchControlsActive ? 1 : 0,
-            buttons,
-            leftTrigger,
-            rightTrigger,
-            leftX,
-            leftY,
-            rightX,
-            rightY
+            state.active ? 1 : 0,
+            state.buttons,
+            state.leftTrigger,
+            state.rightTrigger,
+            state.leftX,
+            state.leftY,
+            state.rightX,
+            state.rightY
         )
+    }
+
+    private func physicalState(_ controller: GCController) -> CoreInputState {
+        var buttons: UInt32 = 0
+        func add(_ pressed: Bool, mask: UInt32) {
+            if pressed { buttons |= mask }
+        }
+
+        if let pad = controller.extendedGamepad {
+            add(pad.buttonA.isPressed, mask: ManicSkinInputMapper.CoreButton.a)
+            add(pad.buttonB.isPressed, mask: ManicSkinInputMapper.CoreButton.b)
+            add(pad.buttonX.isPressed, mask: ManicSkinInputMapper.CoreButton.x)
+            add(pad.buttonY.isPressed, mask: ManicSkinInputMapper.CoreButton.y)
+            add(pad.dpad.left.isPressed, mask: ManicSkinInputMapper.CoreButton.dpadLeft)
+            add(pad.dpad.up.isPressed, mask: ManicSkinInputMapper.CoreButton.dpadUp)
+            add(pad.dpad.right.isPressed, mask: ManicSkinInputMapper.CoreButton.dpadRight)
+            add(pad.dpad.down.isPressed, mask: ManicSkinInputMapper.CoreButton.dpadDown)
+            add(pad.buttonMenu.isPressed, mask: ManicSkinInputMapper.CoreButton.start)
+            add(pad.buttonOptions?.isPressed == true, mask: ManicSkinInputMapper.CoreButton.back)
+            add(pad.leftShoulder.isPressed, mask: ManicSkinInputMapper.CoreButton.white)
+            add(pad.rightShoulder.isPressed, mask: ManicSkinInputMapper.CoreButton.black)
+            add(pad.leftThumbstickButton?.isPressed == true, mask: ManicSkinInputMapper.CoreButton.leftThumb)
+            add(pad.rightThumbstickButton?.isPressed == true, mask: ManicSkinInputMapper.CoreButton.rightThumb)
+            return CoreInputState(
+                active: true,
+                buttons: buttons,
+                leftTrigger: triggerValue(pad.leftTrigger.value),
+                rightTrigger: triggerValue(pad.rightTrigger.value),
+                leftX: axisValue(CGFloat(pad.leftThumbstick.xAxis.value)),
+                leftY: axisValue(CGFloat(pad.leftThumbstick.yAxis.value)),
+                rightX: axisValue(CGFloat(pad.rightThumbstick.xAxis.value)),
+                rightY: axisValue(CGFloat(pad.rightThumbstick.yAxis.value))
+            )
+        }
+
+        if let pad = controller.microGamepad {
+            add(pad.buttonA.isPressed, mask: ManicSkinInputMapper.CoreButton.a)
+            add(pad.buttonX.isPressed, mask: ManicSkinInputMapper.CoreButton.x)
+            add(pad.dpad.left.isPressed, mask: ManicSkinInputMapper.CoreButton.dpadLeft)
+            add(pad.dpad.up.isPressed, mask: ManicSkinInputMapper.CoreButton.dpadUp)
+            add(pad.dpad.right.isPressed, mask: ManicSkinInputMapper.CoreButton.dpadRight)
+            add(pad.dpad.down.isPressed, mask: ManicSkinInputMapper.CoreButton.dpadDown)
+        }
+        return CoreInputState(
+            active: true, buttons: buttons,
+            leftTrigger: 0, rightTrigger: 0,
+            leftX: 0, leftY: 0, rightX: 0, rightY: 0
+        )
+    }
+
+    private func triggerValue(_ value: Float) -> Int16 {
+        Int16((max(0, min(1, value)) * 32767).rounded())
     }
 
     private var currentButtons: UInt32 {
