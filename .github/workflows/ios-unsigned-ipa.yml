@@ -115,9 +115,9 @@ jobs:
           test -f "$CORE"
           test -f "$SLIRP"
           test -f "$MOLTENVK_FRAMEWORK/MoltenVK"
-          xcrun lipo -verify_arch arm64 "$CORE"
-          xcrun lipo -verify_arch arm64 "$SLIRP"
-          xcrun lipo -verify_arch arm64 "$MOLTENVK_FRAMEWORK/MoltenVK"
+          xcrun lipo "$CORE" -verify_arch arm64
+          xcrun lipo "$SLIRP" -verify_arch arm64
+          xcrun lipo "$MOLTENVK_FRAMEWORK/MoltenVK" -verify_arch arm64
           nm -gU "$CORE" | grep -E '[[:space:]]_xemu_ios_main$'
           nm -gU "$CORE" | grep -E '[[:space:]]_xemu_ios_set_touch_controller_state$'
           nm -gU "$CORE" | grep -E '[[:space:]]_xemu_ios_set_external_metal_layer$'
