@@ -181,5 +181,7 @@ jobs:
             ${{ runner.temp }}/dukex-xcodebuild.log
             ${{ runner.temp }}/dukex-vcpkg/buildtrees/*/config-*-err.log
             ${{ runner.temp }}/dukex-vcpkg/buildtrees/*/config-*-meson-log.txt.log
+            ${{ runner.temp }}/dukex-vcpkg/buildtrees/*/package-*-out.log
+            ${{ runner.temp }}/dukex-vcpkg/buildtrees/*/package-*-err.log
           if-no-files-found: ignore
           retention-days: 7
