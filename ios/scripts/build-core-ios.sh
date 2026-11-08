@@ -124,4 +124,15 @@ cd "${BUILD_DIR}"
   --extra-ldflags="${COMMON_LDFLAGS[*]}" \
   "${EXTRA_CONFIGURE_ARGS[@]+"${EXTRA_CONFIGURE_ARGS[@]}"}"
 
+# configure creates a fresh QEMU pyvenv. Install PyYAML into that same
+# interpreter before Ninja invokes subprojects/genconfig/gen_config.py.
+VENV_PYTHON="${BUILD_DIR}/pyvenv/bin/python3"
+if [[ ! -x "${VENV_PYTHON}" ]]; then
+  printf '::error::QEMU did not create the expected Python virtual environment.\\n' >&2
+  exit 1
+fi
+"${VENV_PYTHON}" "${SOURCE_DIR}/python/scripts/mkvenv.py" ensuregroup --online \\
+  "${SOURCE_DIR}/pythondeps.toml" ios-build
+"${VENV_PYTHON}" -c 'import yaml; print("DukeX iOS PyYAML available:", yaml.__version__)'
+
 ninja -C "${BUILD_DIR}" "${NINJA_TARGETS[@]}" "$@"
