@@ -14,7 +14,6 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     env:
-      VCPKG_ROOT: ${{ runner.temp }}/dukex-vcpkg
       IPHONEOS_DEPLOYMENT_TARGET: "16.0"
       SDK_NAME: iphoneos
     steps:
@@ -36,6 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          VCPKG_ROOT="$RUNNER_TEMP/dukex-vcpkg"
           git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
           git -C "$VCPKG_ROOT" checkout 9eec002df1cd109f8f104cd966a763daf9751489
           "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
