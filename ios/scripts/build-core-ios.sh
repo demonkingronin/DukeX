@@ -62,6 +62,18 @@ COMMON_LDFLAGS=(
   "${COMMON_FLAGS[@]}"
   "-framework" "CoreFoundation"
 )
+# Meson's SDL3 CMake fallback does not propagate all required Apple framework
+# link dependencies from SDL3-static to the iOS executable or core dylib.
+# Link SDK frameworks needed by SDL3's UIKit, audio, controller and Metal
+# backends. This only affects native iOS link inputs, not runtime behavior.
+IOS_APPLE_FRAMEWORKS=(
+  AudioToolbox AVFoundation CoreAudio CoreBluetooth
+  CoreGraphics CoreHaptics CoreMotion CoreVideo
+  Foundation GameController Metal QuartzCore UIKit
+)
+for framework in "${IOS_APPLE_FRAMEWORKS[@]}"; do
+  COMMON_LDFLAGS+=("-framework" "${framework}")
+done
 EXTRA_CONFIGURE_ARGS=()
 if [[ -n "${XEMU_IOS_CONFIGURE_ARGS:-}" ]]; then
   read -r -a EXTRA_CONFIGURE_ARGS <<< "${XEMU_IOS_CONFIGURE_ARGS}"

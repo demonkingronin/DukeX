@@ -51,6 +51,16 @@ for cmake_machine_setting in ("CMAKE_SYSTEM_NAME = 'iOS'", "CMAKE_OSX_SYSROOT = 
 if 'echo "[cmake]" >> $cross' not in configure:
     raise SystemExit('Meson CMake cross-file section missing')
 core_build = (root / 'ios/scripts/build-core-ios.sh').read_text()
+# Guard against SDL3's missing CMake-to-Meson framework linkage on iOS.
+frameworks_match = re.search(r'IOS_APPLE_FRAMEWORKS=\((.*?)\)', core_build, re.S)
+if not frameworks_match:
+    raise SystemExit('Missing explicit Apple framework link list for iOS SDL3')
+frameworks = set(frameworks_match.group(1).split())
+for required_framework in ('AudioToolbox', 'AVFoundation', 'CoreAudio', 'CoreBluetooth', 'CoreGraphics', 'CoreHaptics', 'CoreMotion', 'CoreVideo', 'Foundation', 'GameController', 'Metal', 'QuartzCore', 'UIKit'):
+    if required_framework not in frameworks:
+        raise SystemExit(f'Missing SDL3 Apple framework: {required_framework}')
+if 'COMMON_LDFLAGS+=("-framework" "${framework}")' not in core_build:
+    raise SystemExit('SDL3 Apple framework list must feed iOS linker flags')
 requirements = (root / 'pythondeps.toml').read_text()
 if '[ios-build]' not in requirements or 'PyYAML' not in requirements:
     raise SystemExit('PyYAML must be declared for iOS QEMU venv')
@@ -123,4 +133,26 @@ printf '#include <CoreFoundation/CoreFoundation.h>\nvoid dukex_ios_cf_smoke(CFTy
     -isysroot "$sdkroot" -dynamiclib -framework CoreFoundation \
     -x c -o "$smoke_library" -
 xcrun lipo "$smoke_library" -verify_arch arm64
-echo 'DukeX iOS preflight passed: Swift parsed, Xcode project, and CoreFoundation iPhoneOS linkage available.'
+# Check every SDL3 Apple framework before the expensive native dependency
+# installation and full emulator link.
+framework_smoke_library="$smoke_dir/ios-frameworks.dylib"
+xcrun --sdk iphoneos clang -target arm64-apple-ios16.0 \
+  -isysroot "$sdkroot" -dynamiclib -framework CoreFoundation \
+  -framework AudioToolbox \
+  -framework AVFoundation \
+  -framework CoreAudio \
+  -framework CoreBluetooth \
+  -framework CoreGraphics \
+  -framework CoreHaptics \
+  -framework CoreMotion \
+  -framework CoreVideo \
+  -framework Foundation \
+  -framework GameController \
+  -framework Metal \
+  -framework QuartzCore \
+  -framework UIKit \
+  -x c -o "$framework_smoke_library" - <<'C'
+int dukex_ios_framework_smoke(void) { return 0; }
+C
+xcrun lipo "$framework_smoke_library" -verify_arch arm64
+echo 'DukeX iOS preflight passed: Swift parsed, Xcode project, and iPhoneOS framework linkage available.'
