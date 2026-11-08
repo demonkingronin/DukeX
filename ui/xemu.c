@@ -2182,6 +2182,7 @@ int main(int argc, char **argv)
         SDL_Quit();
         exit(1);
     }
+#ifdef CONFIG_IOS
     if (!s_ios_settings_save_registered) {
         if (atexit(xemu_settings_save) == 0) {
             s_ios_settings_save_registered = true;
@@ -2189,6 +2190,9 @@ int main(int argc, char **argv)
             IOS_LOG("warning: could not register settings save at process exit");
         }
     }
+#else
+    atexit(xemu_settings_save);
+#endif
     IOS_LOG("settings loaded");
 
 #ifdef _WIN32
