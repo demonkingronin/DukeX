@@ -1951,6 +1951,10 @@ type_init(register_xemu_display);
 int gArgc;
 char **gArgv;
 
+#ifdef CONFIG_IOS
+static bool s_ios_settings_save_registered;
+#endif
+
 #ifndef CONFIG_IOS
 static void *qemu_main(void *opaque)
 {
@@ -2178,7 +2182,13 @@ int main(int argc, char **argv)
         SDL_Quit();
         exit(1);
     }
-    atexit(xemu_settings_save);
+    if (!s_ios_settings_save_registered) {
+        if (atexit(xemu_settings_save) == 0) {
+            s_ios_settings_save_registered = true;
+        } else {
+            IOS_LOG("warning: could not register settings save at process exit");
+        }
+    }
     IOS_LOG("settings loaded");
 
 #ifdef _WIN32
@@ -2259,6 +2269,13 @@ int main(int argc, char **argv)
     IOS_LOG("render loop exited");
     qemu_sem_post(&display_shutdown_sem);
     qemu_thread_join(&thread);
+#ifdef CONFIG_IOS
+    // The iOS shell returns to the game library without terminating the app.
+    // Persist this session now; atexit alone would defer the save until the
+    // entire DukeX process is closed.
+    xemu_settings_save();
+    IOS_LOG("settings saved after core session");
+#endif
     display_finalize();
     IOS_LOG("xemu_ios_main returning %d", exit_status);
     return exit_status;
