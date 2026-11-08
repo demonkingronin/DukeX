@@ -359,6 +359,14 @@ final class ManicSkinTouchControlsView: UIView {
             self.updateControllerMode(reason: "controller-disconnect")
         })
 
+        controllerObservers.append(NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateControllerMode(reason: "application-became-active")
+        })
+
         // Reconcile once when the app becomes active. While the app is
         // running, GameController connect/disconnect notifications drive
         // changes directly; no periodic background polling is needed.
