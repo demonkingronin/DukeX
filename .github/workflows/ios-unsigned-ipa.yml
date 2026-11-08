@@ -4,12 +4,6 @@ name: Build DukeX iOS (unsigned IPA)
 # queue this workflow; run only after the owner explicitly approves.
 on:
   workflow_dispatch:
-  # Temporary one-time approved build trigger, scoped to this exact branch.
-  push:
-    branches:
-      - build/approved-2026-11-07-dukex
-    paths:
-      - .github/workflows/ios-unsigned-ipa.yml
 
 permissions:
   contents: read
