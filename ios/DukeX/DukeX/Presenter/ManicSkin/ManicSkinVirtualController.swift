@@ -218,8 +218,8 @@ final class ManicSkinVirtualControllerBridge {
             if let rightThumb = pad.rightThumbstickButton {
                 installButtonHandler(rightThumb, mask: ManicSkinInputMapper.CoreButton.rightThumb)
             }
-            installAxisHandler(pad.leftTrigger, left: true)
-            installAxisHandler(pad.rightTrigger, left: false)
+            installTriggerHandler(pad.leftTrigger, left: true)
+            installTriggerHandler(pad.rightTrigger, left: false)
             installDirectionPadHandler(pad.leftThumbstick, left: true)
             installDirectionPadHandler(pad.rightThumbstick, left: false)
         } else if let pad = controller.microGamepad {
@@ -249,10 +249,10 @@ final class ManicSkinVirtualControllerBridge {
         }
     }
 
-    private func installAxisHandler(_ axis: GCControllerAxisInput, left: Bool) {
-        let previousHandler = axis.valueChangedHandler
-        axis.valueChangedHandler = { [weak self] input, value in
-            previousHandler?(input, value)
+    private func installTriggerHandler(_ trigger: GCControllerButtonInput, left: Bool) {
+        let previousHandler = trigger.valueChangedHandler
+        trigger.valueChangedHandler = { [weak self] input, value, pressed in
+            previousHandler?(input, value, pressed)
             guard let self else { return }
             let converted = self.triggerValue(value)
             if left {
@@ -263,7 +263,7 @@ final class ManicSkinVirtualControllerBridge {
             self.publishState()
         }
         physicalInputHandlersToRestore.append {
-            axis.valueChangedHandler = previousHandler
+            trigger.valueChangedHandler = previousHandler
         }
     }
 
