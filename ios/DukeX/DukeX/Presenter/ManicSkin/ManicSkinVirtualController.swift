@@ -97,7 +97,7 @@ final class ManicSkinVirtualControllerBridge {
     private var rightThumbstick = CGPoint.zero
     private var didLogMissingCoreSymbol = false
     private let publishesToCore: Bool
-    private weak var physicalController: GCController?
+    private var physicalController: GCController?
     private var physicalPollTimer: Timer?
     private var lastPublishedState: CoreInputState?
 
