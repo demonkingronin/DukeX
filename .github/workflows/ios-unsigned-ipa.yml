@@ -2,9 +2,6 @@ name: Build DukeX iOS (unsigned IPA)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - build/ios-unsigned-ipa
 
 permissions:
   contents: read
