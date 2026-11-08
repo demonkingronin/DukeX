@@ -41,6 +41,8 @@ triplet = (root / 'ios/vcpkg-triplets/arm64-ios.cmake').read_text()
 required_triplet = 'set(VCPKG_MESON_CROSS_FILE "${CMAKE_CURRENT_LIST_DIR}/meson-ios-cross.txt")'
 if required_triplet not in triplet:
     raise SystemExit('iOS triplet does not register the Meson cross file')
+if 'set(VCPKG_LINKER_FLAGS "-framework CoreFoundation")' not in triplet:
+    raise SystemExit('iOS vcpkg triplet must link CoreFoundation (required by libintl)')
 
 cross = configparser.ConfigParser()
 if not cross.read(root / 'ios/vcpkg-triplets/meson-ios-cross.txt'):
@@ -70,10 +72,17 @@ find ios/DukeX/DukeX -name '*.swift' -type f -print0 | xargs -0 xcrun swiftc -fr
 
 sdkroot="$(xcrun --sdk iphoneos --show-sdk-path)"
 test -d "$sdkroot"
-smoke_object="${RUNNER_TEMP:-/tmp}/dukex-ios-target-smoke.$$.o"
-trap 'rm -f "$smoke_object"' EXIT
+smoke_object="${RUNNER_TEMP:-/tmp}/dukex-ios-target-smoke.$.o"
+smoke_library="${RUNNER_TEMP:-/tmp}/dukex-ios-corefoundation-smoke.$.dylib"
+trap 'rm -f "$smoke_object" "$smoke_library"' EXIT
 printf 'int dukex_ios_smoke(void) { return 0; }\n' | \
   xcrun --sdk iphoneos clang -target arm64-apple-ios16.0 \
     -isysroot "$sdkroot" -x c -c -o "$smoke_object" -
 xcrun lipo "$smoke_object" -verify_arch arm64
-echo 'DukeX iOS preflight passed: Swift parsed, Xcode project and iPhoneOS target available.'
+# Validate that Apple's device SDK can link a CoreFoundation consumer.
+printf '#include <CoreFoundation/CoreFoundation.h>\nvoid dukex_ios_cf_smoke(CFTypeRef ref) { CFRelease(ref); }\n' | \
+  xcrun --sdk iphoneos clang -target arm64-apple-ios16.0 \
+    -isysroot "$sdkroot" -dynamiclib -framework CoreFoundation \
+    -x c -o "$smoke_library" -
+xcrun lipo "$smoke_library" -verify_arch arm64
+echo 'DukeX iOS preflight passed: Swift parsed, Xcode project, and CoreFoundation iPhoneOS linkage available.'

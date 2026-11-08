@@ -4,5 +4,8 @@ set(VCPKG_LIBRARY_LINKAGE static)
 set(VCPKG_CMAKE_SYSTEM_NAME iOS)
 set(VCPKG_BUILD_TYPE release)
 set(VCPKG_OSX_ARCHITECTURES arm64)
+# libintl and other Apple-native static dependencies reference CoreFoundation.
+# Set the framework for vcpkg's CMake and generated Meson link arguments.
+set(VCPKG_LINKER_FLAGS "-framework CoreFoundation")
 # iOS ARM64 test executables are not runnable on macOS ARM64.
 set(VCPKG_MESON_CROSS_FILE "${CMAKE_CURRENT_LIST_DIR}/meson-ios-cross.txt")
