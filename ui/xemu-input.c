@@ -457,19 +457,6 @@ static void xemu_input_update_ios_touch_binding(void)
     }
 }
 
-static bool xemu_input_has_sdl_gamepad(void)
-{
-    ControllerState *iter;
-
-    QTAILQ_FOREACH(iter, &available_controllers, entry) {
-        if (iter->type == INPUT_DEVICE_SDL_GAMEPAD) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 static void xemu_input_scan_existing_gamepads(bool verbose)
 {
     int count = 0;
