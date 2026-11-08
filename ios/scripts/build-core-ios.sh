@@ -39,6 +39,15 @@ RANLIB="$(xcrun --sdk "${SDK_NAME}" --find ranlib)"
 NM="$(xcrun --sdk "${SDK_NAME}" --find nm)"
 STRIP="$(xcrun --sdk "${SDK_NAME}" --find strip)"
 PKG_CONFIG="${PKG_CONFIG:-pkg-config}"
+# CMake-backed Meson subprojects (SDL3, volk and glslang) must use a host
+# executable, not one inferred as an iOS target tool.
+if ! command -v cmake >/dev/null 2>&1; then
+  printf '::error::Host CMake is required for DukeX iOS subprojects.\n' >&2
+  exit 1
+fi
+DUKEX_IOS_CMAKE="$(command -v cmake)"
+"$DUKEX_IOS_CMAKE" --version
+export DUKEX_IOS_CMAKE
 TARGET="arm64-apple-ios${IOS_DEPLOYMENT_TARGET}"
 COMMON_FLAGS=(
   "-target" "${TARGET}"
