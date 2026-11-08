@@ -72,9 +72,10 @@ find ios/DukeX/DukeX -name '*.swift' -type f -print0 | xargs -0 xcrun swiftc -fr
 
 sdkroot="$(xcrun --sdk iphoneos --show-sdk-path)"
 test -d "$sdkroot"
-smoke_object="${RUNNER_TEMP:-/tmp}/dukex-ios-target-smoke.$.o"
-smoke_library="${RUNNER_TEMP:-/tmp}/dukex-ios-corefoundation-smoke.$.dylib"
-trap 'rm -f "$smoke_object" "$smoke_library"' EXIT
+smoke_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/dukex-ios-smoke.XXXXXX")"
+smoke_object="$smoke_dir/target.o"
+smoke_library="$smoke_dir/corefoundation.dylib"
+trap 'rm -rf "$smoke_dir"' EXIT
 printf 'int dukex_ios_smoke(void) { return 0; }\n' | \
   xcrun --sdk iphoneos clang -target arm64-apple-ios16.0 \
     -isysroot "$sdkroot" -x c -c -o "$smoke_object" -
