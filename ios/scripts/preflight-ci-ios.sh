@@ -75,5 +75,5 @@ trap 'rm -f "$smoke_object"' EXIT
 printf 'int dukex_ios_smoke(void) { return 0; }\n' | \
   xcrun --sdk iphoneos clang -target arm64-apple-ios16.0 \
     -isysroot "$sdkroot" -x c -c -o "$smoke_object" -
-xcrun lipo -verify_arch arm64 "$smoke_object"
+xcrun lipo "$smoke_object" -verify_arch arm64
 echo 'DukeX iOS preflight passed: Swift parsed, Xcode project and iPhoneOS target available.'
