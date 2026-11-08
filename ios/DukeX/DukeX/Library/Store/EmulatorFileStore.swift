@@ -10,6 +10,7 @@ final class EmulatorFileStore: ObservableObject {
     @Published private(set) var eeprom: LibraryFile?
     @Published private(set) var hdd: LibraryFile?
     @Published private(set) var games: [LibraryFile] = []
+    @Published private(set) var gameResolutionScaleByID: [String: Int] = [:]
     @Published private(set) var skins: [ManicSkinLibraryItem] = []
     @Published var selectedGameID = "" {
         didSet {
@@ -453,6 +454,19 @@ final class EmulatorFileStore: ObservableObject {
             .map { makeGameLibraryFile(from: $0) }
             .sorted(by: sortByName)
 
+        // Cache config values when the library refreshes, not on every
+        // SwiftUI render or controller input event.
+        gameResolutionScaleByID = Dictionary(uniqueKeysWithValues: games.map { game in
+            let scale: Int
+            if let url = game.customConfigURL,
+               let toml = try? String(contentsOf: url, encoding: .utf8) {
+                scale = GameResolutionScaleConfig.scale(in: toml)
+            } else {
+                scale = 1
+            }
+            return (game.id, scale)
+        })
+
         skins = skinFiles
 
         try refreshFolderStorageUsage()
@@ -635,6 +649,46 @@ final class EmulatorFileStore: ObservableObject {
         }
 
         return addedCover
+    }
+
+    func resolutionScale(for game: LibraryFile) -> Int {
+        gameResolutionScaleByID[game.id] ?? 1
+    }
+
+    func setResolutionScale(_ scale: Int, for game: LibraryFile) throws {
+        guard GameResolutionScaleConfig.allowedValues.contains(scale) else {
+            throw NSError(
+                domain: "DukeX.GameResolutionScale",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Select a resolution scale between 1× and 3×."]
+            )
+        }
+
+        try prepareDirectories()
+        let destination = customConfigURL(for: game)
+        let currentConfigURL = game.customConfigURL ?? destination
+
+        let toml: String
+        if FileManager.default.fileExists(atPath: currentConfigURL.path) {
+            toml = try String(contentsOf: currentConfigURL, encoding: .utf8)
+        } else {
+            // A game-specific config must also contain the BIOS, HDD, DVD and
+            // network paths. Reuse the same template as a normal game launch.
+            let systemFiles = try makeSystemFileSet()
+            toml = XemuLaunchPlan.defaultConfigTOML(
+                bios: systemFiles.bios,
+                mcpx: systemFiles.mcpx,
+                eeprom: systemFiles.eeprom,
+                hdd: systemFiles.hdd,
+                game: game,
+                gamesDirectoryURL: romsDirectoryURL,
+                networkSettings: networkSettings
+            )
+        }
+
+        let updatedConfig = GameResolutionScaleConfig.setting(scale, in: toml)
+        try updatedConfig.write(to: destination, atomically: true, encoding: .utf8)
+        try refresh()
     }
 
     func importCustomConfig(_ url: URL, for game: LibraryFile) throws {
