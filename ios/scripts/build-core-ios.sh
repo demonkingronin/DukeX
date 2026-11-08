@@ -124,6 +124,14 @@ cd "${BUILD_DIR}"
   --extra-ldflags="${COMMON_LDFLAGS[*]}" \
   "${EXTRA_CONFIGURE_ARGS[@]+"${EXTRA_CONFIGURE_ARGS[@]}"}"
 
+# Fail before compilation if QEMU did not produce an iOS CMake machine
+# file. Otherwise SDL3 silently configures macOS/Cocoa and fails during
+# device compilation because desktop OpenGL types are unavailable.
+if ! grep -Fq "CMAKE_SYSTEM_NAME = 'iOS'" "${BUILD_DIR}/config-meson.cross"; then
+  printf '::error::Meson cross file is missing CMAKE_SYSTEM_NAME=iOS.\n' >&2
+  exit 1
+fi
+
 # configure creates a fresh QEMU pyvenv. Install PyYAML into that same
 # interpreter before Ninja invokes subprojects/genconfig/gen_config.py.
 VENV_PYTHON="${BUILD_DIR}/pyvenv/bin/python3"

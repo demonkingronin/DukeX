@@ -35,6 +35,13 @@ meson = (root / 'meson.build').read_text()
 for cmake_option in ("'CMAKE_SYSTEM_NAME': 'iOS'", "'CMAKE_OSX_SYSROOT': 'iphoneos'", "'CMAKE_OSX_ARCHITECTURES': 'arm64'"):
     if cmake_option not in meson:
         raise SystemExit(f'SDL3 iOS CMake target setting missing: {cmake_option}')
+# The Meson-generated CMake toolchain overrides command-line platform options.
+# Check the cross-file override before installing expensive native dependencies.
+for cmake_machine_setting in ("CMAKE_SYSTEM_NAME = 'iOS'", "CMAKE_OSX_SYSROOT = 'iphoneos'", "CMAKE_OSX_ARCHITECTURES = 'arm64'"):
+    if f'echo "{cmake_machine_setting}" >> $cross' not in configure:
+        raise SystemExit(f'Meson CMake cross-file iOS setting missing: {cmake_machine_setting}')
+if 'echo "[cmake]" >> $cross' not in configure:
+    raise SystemExit('Meson CMake cross-file section missing')
 core_build = (root / 'ios/scripts/build-core-ios.sh').read_text()
 requirements = (root / 'pythondeps.toml').read_text()
 if '[ios-build]' not in requirements or 'PyYAML' not in requirements:
