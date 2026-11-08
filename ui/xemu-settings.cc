@@ -167,6 +167,7 @@ static const char *read_file(FILE *fd)
 
 bool xemu_settings_load(void)
 {
+    error_msg.clear();
     const char *settings_path = xemu_settings_get_path();
     bool success = false;
 
