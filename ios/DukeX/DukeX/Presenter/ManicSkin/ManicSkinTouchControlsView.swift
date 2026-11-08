@@ -30,7 +30,6 @@ final class ManicSkinTouchControlsView: UIView {
     private var resolvedRepresentation: ManicSkinResolvedRepresentation?
     private var lastLayoutSignature = ""
     private var controllerObservers: [NSObjectProtocol] = []
-    private var controllerRefreshTimer: Timer?
     private var activeTouches: [TouchTrackingKey: ActiveTouch] = [:]
     private var touchControlsActive = false
 
@@ -360,28 +359,12 @@ final class ManicSkinTouchControlsView: UIView {
             self.updateControllerMode(reason: "controller-disconnect")
         })
 
-        // Controller notifications can be delayed or missed while iOS suspends
-        // the app. Reconcile the actual connected-device list periodically
-        // while gameplay is presented, and immediately after returning active.
-        controllerObservers.append(NotificationCenter.default.addObserver(
-            forName: UIApplication.didBecomeActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.updateControllerMode(reason: "application-became-active")
-        })
-
-        controllerRefreshTimer?.invalidate()
-        let refreshTimer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
-            self?.updateControllerMode(reason: "controller-reconcile")
-        }
-        RunLoop.main.add(refreshTimer, forMode: .common)
-        controllerRefreshTimer = refreshTimer
+        // Reconcile once when the app becomes active. While the app is
+        // running, GameController connect/disconnect notifications drive
+        // changes directly; no periodic background polling is needed.
     }
 
     private func stopControllerObservers() {
-        controllerRefreshTimer?.invalidate()
-        controllerRefreshTimer = nil
         for observer in controllerObservers {
             NotificationCenter.default.removeObserver(observer)
         }
