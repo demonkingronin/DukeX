@@ -1,19 +1,12 @@
-name: DukeX iOS Auto Build (until IPA succeeds)
+name: DukeX iOS Build (legacy manual entry)
 
-# The owner has approved automatic builds on new build-branch changes.
-# No schedule: retrying an unchanged failed commit wastes Actions minutes.
-# This workflow disables itself after a successful reusable build uploads an IPA.
+# Manual-only. No push, pull request, or scheduled build triggers.
+# The owner must explicitly authorize each build.
 on:
-  push:
-    branches:
-      - build/approved-2026-11-07-dukex
+  workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: dukex-ios-auto-until-success
-  cancel-in-progress: true
 
 jobs:
   build:
@@ -21,20 +14,3 @@ jobs:
     permissions:
       contents: read
     uses: ./.github/workflows/ios-unsigned-ipa.yml
-
-  disable-after-success:
-    name: Stop automatic DukeX builds after IPA upload
-    needs: build
-    if: ${{ needs.build.result == 'success' }}
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Disable this automatic workflow only
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          gh api --silent -X PUT "repos/$GH_REPO/actions/workflows/dukex-auto-build.yml/disable"
-          echo "DukeX auto-build workflow disabled after IPA upload; the manual workflow stays enabled."
