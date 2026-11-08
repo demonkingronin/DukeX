@@ -30,6 +30,12 @@ from pathlib import Path
 import re
 
 root = Path.cwd()
+configure = (root / 'configure').read_text()
+core_build = (root / 'ios/scripts/build-core-ios.sh').read_text()
+if configure.count('cmake = [$(meson_quote "$DUKEX_IOS_CMAKE")]') != 2:
+    raise SystemExit('QEMU configure must pass host CMake in both Meson machine files')
+if 'export DUKEX_IOS_CMAKE' not in core_build:
+    raise SystemExit('iOS core build must export the host CMake executable')
 manifest = json.loads((root / 'ios/vcpkg.json').read_text())
 baseline = manifest.get('builtin-baseline', '')
 if not re.fullmatch(r'[0-9a-f]{40}', baseline):
