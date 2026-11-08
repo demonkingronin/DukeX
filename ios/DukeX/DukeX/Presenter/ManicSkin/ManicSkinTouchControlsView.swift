@@ -352,9 +352,11 @@ final class ManicSkinTouchControlsView: UIView {
             queue: .main
         ) { [weak self] notification in
             guard let self else { return }
-            if let controller = notification.object as? GCController,
-               self.controllerBridge.isManagedVirtualController(controller) {
-                return
+            if let controller = notification.object as? GCController {
+                if self.controllerBridge.isManagedVirtualController(controller) {
+                    return
+                }
+                self.controllerBridge.handlePhysicalControllerDisconnect(controller)
             }
             self.updateControllerMode(reason: "controller-disconnect")
         })
