@@ -182,6 +182,24 @@ final class ManicSkinVirtualControllerBridge {
         publishState()
     }
 
+    func handlePhysicalControllerDisconnect(_ controller: GCController) {
+        guard physicalController === controller else { return }
+        restorePhysicalInputHandlers()
+        physicalController = nil
+        physicalInputState = CoreInputState(
+            active: false,
+            buttons: 0,
+            leftTrigger: 0,
+            rightTrigger: 0,
+            leftX: 0,
+            leftY: 0,
+            rightX: 0,
+            rightY: 0
+        )
+        NativeMetalDiagnostics.log("PHYSICAL_INPUT", "attached=0 reason=disconnect-notification")
+        publishState()
+    }
+
     private func connectedPhysicalController() -> GCController? {
         GCController.controllers().first { controller in
             !isVirtualController(controller) &&
