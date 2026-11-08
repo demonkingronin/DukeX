@@ -12,11 +12,13 @@ struct GameListRow: View {
     let liveStatus: GameLiveStatus?
     let isFavorite: Bool
     let resolutionScale: Int
+    let skipBoot: Bool
     let launch: () -> Void
     let addCover: () -> Void
     let copyLaunchLink: () -> Void
     let importConfig: () -> Void
     let setResolutionScale: (Int) -> Void
+    let setSkipBoot: (Bool) -> Void
     let clearShaderCache: () -> Void
     let editGameData: () -> Void
     let toggleFavorite: () -> Void
@@ -229,15 +231,32 @@ struct GameListRow: View {
                     setResolutionScale(scale)
                 } label: {
                     if resolutionScale == scale {
-                        Label("\(scale)×", systemImage: "checkmark")
+                        Label(GameResolutionScaleConfig.title(for: scale), systemImage: "checkmark")
                     } else {
-                        Text("\(scale)×")
+                        Text(GameResolutionScaleConfig.title(for: scale))
                     }
                 }
                 .disabled(resolutionScale == scale)
             }
         } label: {
-            Label("Display Quality (\(resolutionScale)×)", systemImage: "display")
+            Label("Display Quality (\(GameResolutionScaleConfig.title(for: resolutionScale)))", systemImage: "display")
+        }
+
+        Menu {
+            ForEach([false, true], id: \.self) { enabled in
+                Button {
+                    setSkipBoot(enabled)
+                } label: {
+                    if skipBoot == enabled {
+                        Label(enabled ? "On" : "Off", systemImage: "checkmark")
+                    } else {
+                        Text(enabled ? "On" : "Off")
+                    }
+                }
+                .disabled(skipBoot == enabled)
+            }
+        } label: {
+            Label("Skip Boot (\(skipBoot ? "On" : "Off"))", systemImage: "forward.end")
         }
 
         Button(action: clearShaderCache) {

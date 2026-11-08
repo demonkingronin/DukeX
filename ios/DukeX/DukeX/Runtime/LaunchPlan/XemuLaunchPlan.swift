@@ -175,7 +175,12 @@ struct XemuLaunchPlan: Identifiable {
 
 
 enum GameResolutionScaleConfig {
-    static let allowedValues = [1, 2, 3]
+    // [display.quality] surface_scale: 1 = Low, 2 = High.
+    static let allowedValues = [1, 2]
+
+    static func title(for scale: Int) -> String {
+        scale >= 2 ? "High" : "Low"
+    }
 
     static func scale(in toml: String) -> Int {
         var inQuality = false
@@ -255,6 +260,81 @@ enum GameResolutionScaleConfig {
             return nil
         }
         return pieces[1].trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func uncommented(_ line: String) -> String {
+        String(line.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).first ?? "")
+    }
+}
+
+    
+// Each game's Skip Boot option updates only [general] skip_boot_anim.
+// This skips the Xbox boot animation, not BIOS or machine initialization.
+enum GameSkipBootConfig {
+    static func isEnabled(in toml: String) -> Bool {
+        var inGeneral = false
+        for line in toml.components(separatedBy: "\n") {
+            if isHeader(line) {
+                inGeneral = uncommented(line).trimmingCharacters(in: .whitespacesAndNewlines) == "[general]"
+            } else if inGeneral, let value = value(in: line) {
+                return value == "true"
+            }
+        }
+        return false
+    }
+
+    static func setting(_ enabled: Bool, in toml: String) -> String {
+        var lines = toml.components(separatedBy: "\n")
+        var generalStart: Int?
+        var generalEnd = lines.count
+
+        for index in lines.indices where isHeader(lines[index]) {
+            if generalStart != nil {
+                generalEnd = index
+                break
+            }
+            if uncommented(lines[index]).trimmingCharacters(in: .whitespacesAndNewlines) == "[general]" {
+                generalStart = index
+            }
+        }
+
+        let settingLine = "skip_boot_anim = \(enabled ? "true" : "false")"
+        guard let generalStart else {
+            // A missing [general] table can be safely prepended to an imported TOML.
+            return "[general]\n\(settingLine)\n\n" + toml
+        }
+
+        let matches = ((generalStart + 1)..<generalEnd)
+            .filter { value(in: lines[$0]) != nil }
+        if let first = matches.first {
+            let oldLine = lines[first]
+            let whitespace = String(oldLine.prefix(while: { $0 == " " || $0 == "\t" }))
+            let comment = oldLine.firstIndex(of: "#").map { String(oldLine[$0...]) } ?? ""
+            lines[first] = whitespace + settingLine + (comment.isEmpty ? "" : " \(comment)")
+            // Avoid duplicate TOML keys if the user imported an unusual config.
+            for extra in matches.dropFirst().reversed() {
+                lines.remove(at: extra)
+            }
+        } else {
+            lines.insert(settingLine, at: generalStart + 1)
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    private static func isHeader(_ line: String) -> Bool {
+        let key = uncommented(line).trimmingCharacters(in: .whitespacesAndNewlines)
+        return key.hasPrefix("[") && key.hasSuffix("]")
+    }
+
+    private static func value(in line: String) -> String? {
+        let parts = uncommented(line).split(
+            separator: "=", maxSplits: 1, omittingEmptySubsequences: false
+        )
+        guard parts.count == 2,
+              parts[0].trimmingCharacters(in: .whitespacesAndNewlines) == "skip_boot_anim" else {
+            return nil
+        }
+        return parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func uncommented(_ line: String) -> String {

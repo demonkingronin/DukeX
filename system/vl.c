@@ -3118,6 +3118,10 @@ void qemu_init(int argc, char **argv)
 
 /*****************************************************************************/
 
+#ifdef CONFIG_IOS
+    /* Previous core session completed before this fresh game launch. */
+    qemu_config_prepare_for_relaunch();
+#endif
 
     qemu_add_opts(&qemu_drive_opts);
     qemu_add_drive_opts(&qemu_legacy_drive_opts);

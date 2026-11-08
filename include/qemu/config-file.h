@@ -13,6 +13,10 @@ extern QemuOptsList *drive_config_groups[];
 
 void qemu_add_opts(QemuOptsList *list);
 void qemu_add_drive_opts(QemuOptsList *list);
+#ifdef CONFIG_IOS
+/* Called only between completed iOS emulator sessions. */
+void qemu_config_prepare_for_relaunch(void);
+#endif
 int qemu_global_option(const char *str);
 
 int qemu_config_parse(FILE *fp, QemuOptsList **lists, const char *fname,
