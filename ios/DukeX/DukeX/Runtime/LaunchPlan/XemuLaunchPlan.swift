@@ -116,7 +116,6 @@ struct XemuLaunchPlan: Identifiable {
         let eepromPathLine = eeprom.map {
             "eeprom_path = \(tomlQuoted($0.url.path))\n"
         } ?? ""
-        if customConfigURL == nil {
         return """
         [general]
         show_welcome = false
