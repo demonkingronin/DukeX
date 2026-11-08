@@ -1682,6 +1682,16 @@ if not get_option('sdl').auto() or have_system
   sdl = dependency('sdl3', required: false, allow_fallback: false)
   if not sdl.found() and not get_option('sdl').disabled()
     sdl3_cmake_opts = cmake.subproject_options()
+    # Meson's CMake fallback runs on macOS, but SDL3 itself targets iOS.
+    # Without explicit target settings CMake injects the macOS SDK and
+    # SDL_egl.c is compiled without the iOS OpenGL ES declarations.
+    if host_is_ios
+      sdl3_cmake_opts.add_cmake_defines({
+        'CMAKE_SYSTEM_NAME': 'iOS',
+        'CMAKE_OSX_SYSROOT': 'iphoneos',
+        'CMAKE_OSX_ARCHITECTURES': 'arm64',
+      })
+    endif
     sdl3_cmake_opts.add_cmake_defines({
       'SDL_CAMERA': 'OFF',
       'SDL_DISKAUDIO': 'OFF',
