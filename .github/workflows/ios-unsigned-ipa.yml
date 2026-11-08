@@ -17,6 +17,12 @@ jobs:
       - name: Checkout DukeX source
         uses: actions/checkout@v4
 
+      - name: Preflight iOS inputs, Swift syntax and SDK before dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash ios/scripts/preflight-ci-ios.sh
+
       - name: Install host build tools
         shell: bash
         run: |
@@ -165,7 +171,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload compiler logs if build fails
+      - name: Upload build diagnostics if build fails
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -173,5 +179,7 @@ jobs:
           path: |
             ${{ runner.temp }}/dukex-core-build.log
             ${{ runner.temp }}/dukex-xcodebuild.log
+            ${{ runner.temp }}/dukex-vcpkg/buildtrees/*/config-*-err.log
+            ${{ runner.temp }}/dukex-vcpkg/buildtrees/*/config-*-meson-log.txt.log
           if-no-files-found: ignore
           retention-days: 7

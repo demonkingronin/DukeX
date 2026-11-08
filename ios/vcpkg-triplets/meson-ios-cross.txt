@@ -1,0 +1,4 @@
+# iPhoneOS executables cannot run on macOS even when both hosts are ARM64.
+# This file is merged after vcpkg's generated Meson cross file.
+[properties]
+needs_exe_wrapper = true
