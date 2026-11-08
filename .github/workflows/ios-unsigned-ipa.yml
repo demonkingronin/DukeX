@@ -43,7 +43,26 @@ jobs:
           VCPKG_ROOT="$RUNNER_TEMP/dukex-vcpkg"
           git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
           git -C "$VCPKG_ROOT" checkout 9eec002df1cd109f8f104cd966a763daf9751489
-          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          # The upstream download can briefly return HTTP 5xx/429 or curl
+          # transport errors. Retry only transient failures to save CI minutes.
+          BOOTSTRAP_LOG="$RUNNER_TEMP/dukex-vcpkg-bootstrap.log"
+          for attempt in 1 2 3 4; do
+            echo "Bootstrapping vcpkg (attempt $attempt/4)"
+            if "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics 2>&1 | tee "$BOOTSTRAP_LOG"; then
+              break
+            fi
+            if ! grep -Eiq 'curl: \((18|28|52|56)\)|returned error: (429|500|502|503|504)|HTTP[ /]+(429|500|502|503|504)|timed out|connection reset' "$BOOTSTRAP_LOG"; then
+              echo "::error::vcpkg bootstrap failed for a non-network reason; not retrying."
+              exit 1
+            fi
+            if [ "$attempt" -eq 4 ]; then
+              echo "::error::vcpkg bootstrap failed after four attempts."
+              exit 1
+            fi
+            delay=$((10 * (1 << (attempt - 1))))
+            echo "::warning::Transient vcpkg download failure; retrying in $delay seconds."
+            sleep "$delay"
+          done
           echo "VCPKG_ROOT=$VCPKG_ROOT" >> "$GITHUB_ENV"
           echo "XEMU_IOS_VCPKG_PREFIX=$VCPKG_ROOT/installed/arm64-ios" >> "$GITHUB_ENV"
           echo "MOLTENVK_ROOT=$VCPKG_ROOT/installed/arm64-ios" >> "$GITHUB_ENV"
