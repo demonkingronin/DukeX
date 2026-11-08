@@ -1932,6 +1932,24 @@ static void display_finalize(void)
     }
 #endif
     SDL_DestroyWindow(m_window);
+    m_window = NULL;
+    m_context = NULL;
+
+    // qemu_cleanup() destroys the emulated consoles before this display
+    // teardown. Release the display driver's separately allocated keyboard
+    // trackers and console array so returning to the iOS library doesn't leak
+    // one set per game session.
+    if (scon_list) {
+        for (int i = 0; i < num_outputs; i++) {
+            if (scon_list[i].kbd) {
+                qkbd_state_free(scon_list[i].kbd);
+                scon_list[i].kbd = NULL;
+            }
+        }
+        g_free(scon_list);
+        scon_list = NULL;
+    }
+    num_outputs = 0;
     SDL_Quit();
 }
 
@@ -1950,6 +1968,10 @@ type_init(register_xemu_display);
 
 int gArgc;
 char **gArgv;
+
+#ifdef CONFIG_IOS
+static bool s_ios_settings_save_registered;
+#endif
 
 #ifndef CONFIG_IOS
 static void *qemu_main(void *opaque)
@@ -2178,7 +2200,17 @@ int main(int argc, char **argv)
         SDL_Quit();
         exit(1);
     }
+#ifdef CONFIG_IOS
+    if (!s_ios_settings_save_registered) {
+        if (atexit(xemu_settings_save) == 0) {
+            s_ios_settings_save_registered = true;
+        } else {
+            IOS_LOG("warning: could not register settings save at process exit");
+        }
+    }
+#else
     atexit(xemu_settings_save);
+#endif
     IOS_LOG("settings loaded");
 
 #ifdef _WIN32
@@ -2259,7 +2291,16 @@ int main(int argc, char **argv)
     IOS_LOG("render loop exited");
     qemu_sem_post(&display_shutdown_sem);
     qemu_thread_join(&thread);
+#ifdef CONFIG_IOS
+    // The iOS shell returns to the game library without terminating the app.
+    // Persist this session now; atexit alone would defer the save until the
+    // entire DukeX process is closed.
+    xemu_settings_save();
+    IOS_LOG("settings saved after core session");
+#endif
     display_finalize();
+    qemu_sem_destroy(&display_init_sem);
+    qemu_sem_destroy(&display_shutdown_sem);
     IOS_LOG("xemu_ios_main returning %d", exit_status);
     return exit_status;
 }

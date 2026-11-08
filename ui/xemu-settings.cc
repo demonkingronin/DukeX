@@ -40,7 +40,8 @@
 struct config g_config;
 
 static const char *filename = "xemu.toml";
-static const char *settings_path;
+static char *settings_path;
+static bool settings_path_owned = false;
 static std::string error_msg;
 
 const char *xemu_settings_get_error_message(void)
@@ -65,11 +66,19 @@ static bool xemu_settings_detect_portable_mode(void)
 void xemu_settings_set_path(const char *path)
 {
     assert(path != NULL);
-    assert(settings_path == NULL);
-    settings_path = path;
+
+    // The iOS launcher passes this path through argv, whose strings are freed
+    // as soon as xemu_ios_main returns. Keep an owned copy so a later launch
+    // never reads a dangling argv pointer. xemu_ios_main may be invoked again
+    // in the same process, so replacing the previous path must be supported.
+    char *replacement = g_strdup(path);
+    if (settings_path_owned) {
+        g_free(settings_path);
+    }
+    settings_path = replacement;
+    settings_path_owned = true;
     fprintf(stderr, "%s: config path: %s\n", __func__, settings_path);
 }
-
 const char *xemu_settings_get_base_path(void)
 {
     static const char *base_path = NULL;
@@ -100,6 +109,7 @@ const char *xemu_settings_get_path(void)
     const char *base = xemu_settings_get_base_path();
     assert(base != NULL);
     settings_path = g_strdup_printf("%s%s", base, filename);
+    settings_path_owned = true;
     fprintf(stderr, "%s: config path: %s\n", __func__, settings_path);
     return settings_path;
 }
@@ -157,6 +167,7 @@ static const char *read_file(FILE *fd)
 
 bool xemu_settings_load(void)
 {
+    error_msg.clear();
     const char *settings_path = xemu_settings_get_path();
     bool success = false;
 

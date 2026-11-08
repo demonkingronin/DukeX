@@ -1,5 +1,7 @@
 name: Build DukeX iOS (unsigned IPA)
 
+# Manual-only. A commit, pull request, or branch update must never
+# queue this workflow; run only after the owner explicitly approves.
 on:
   workflow_dispatch:
 
@@ -8,23 +10,65 @@ permissions:
 
 jobs:
   build-ios:
-    name: Compile iOS app and package unsigned IPA
+    name: Build forked native core and package unsigned IPA
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 120
     steps:
       - name: Checkout DukeX source
         uses: actions/checkout@v4
 
-      - name: Check macOS and Xcode
+      - name: Preflight iOS inputs, Swift syntax and SDK before dependencies
+        shell: bash
         run: |
+          set -euo pipefail
+          bash ios/scripts/preflight-ci-ios.sh
+
+      - name: Install host build tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install meson ninja pkgconf
           xcodebuild -version
           xcrun --sdk iphoneos --show-sdk-version
-          test -f ios/DukeX/DukeX.xcodeproj/project.pbxproj
+          meson --version
+          ninja --version
+          pkg-config --version
 
-      # The aspect-ratio feature changes the Swift app, not the emulation core.
-      # Reuse only the three runtime libraries from the version-matched
-      # official DukeX release. Verify the published package checksum.
-      - name: Obtain verified upstream iOS runtime libraries
+      - name: Bootstrap pinned vcpkg toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          VCPKG_ROOT="$RUNNER_TEMP/dukex-vcpkg"
+          git clone --filter=blob:none https://github.com/microsoft/vcpkg.git "$VCPKG_ROOT"
+          git -C "$VCPKG_ROOT" checkout 9eec002df1cd109f8f104cd966a763daf9751489
+          "$VCPKG_ROOT/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$VCPKG_ROOT" >> "$GITHUB_ENV"
+          echo "XEMU_IOS_VCPKG_PREFIX=$VCPKG_ROOT/installed/arm64-ios" >> "$GITHUB_ENV"
+          echo "MOLTENVK_ROOT=$VCPKG_ROOT/installed/arm64-ios" >> "$GITHUB_ENV"
+
+      - name: Restore iOS dependency cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/dukex-vcpkg/installed
+            ${{ runner.temp }}/dukex-vcpkg/downloads
+          key: ${{ runner.os }}-dukex-ios-vcpkg-2026.10.16-${{ hashFiles('ios/vcpkg.json', 'ios/vcpkg-triplets/**', 'ios/vcpkg-overlays/**') }}
+
+      - name: Install pinned arm64 iOS native dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$VCPKG_ROOT/vcpkg" install \
+            --triplet=arm64-ios \
+            --overlay-triplets="$GITHUB_WORKSPACE/ios/vcpkg-triplets" \
+            --overlay-ports="$GITHUB_WORKSPACE/ios/vcpkg-overlays" \
+            --x-manifest-root="$GITHUB_WORKSPACE/ios" \
+            --x-install-root="$VCPKG_ROOT/installed"
+
+      # The upstream package is used only as a checksum-verified source of
+      # the runtime MoltenVK.framework. The native xemu core and libslirp
+      # are built from this fork below.
+      - name: Obtain verified MoltenVK runtime framework
         shell: bash
         env:
           ORIGINAL_IPA: https://github.com/MaftyManicEMU/DukeX/releases/download/v1.0.2/DukeX.v1.0.2.ipa
@@ -44,23 +88,43 @@ jobs:
             echo "::error::Official IPA does not contain Payload/*.app"
             exit 1
           fi
-          UPSTREAM_FRAMEWORKS="$UPSTREAM_APP/Frameworks"
-          CORE="$UPSTREAM_FRAMEWORKS/libxemu-ios-core.dylib"
-          SLIRP="$UPSTREAM_FRAMEWORKS/libslirp.0.dylib"
-          MOLTENVK="$UPSTREAM_FRAMEWORKS/MoltenVK.framework"
-          for file in "$CORE" "$SLIRP" "$MOLTENVK/MoltenVK"; do
-            if [ ! -f "$file" ]; then
-              echo "::error::Missing upstream dependency: $file"
-              exit 1
-            fi
-          done
-          mkdir -p build-ios-arm64/subprojects/slirp
-          cp "$CORE" build-ios-arm64/libxemu-ios-core.dylib
-          cp "$SLIRP" build-ios-arm64/subprojects/slirp/libslirp.0.dylib
-          echo "MOLTENVK_FRAMEWORK=$MOLTENVK" >> "$GITHUB_ENV"
-          echo "Bundled verified official DukeX v1.0.2 runtime libraries."
+          MOLTENVK_FRAMEWORK="$UPSTREAM_APP/Frameworks/MoltenVK.framework"
+          if [ ! -f "$MOLTENVK_FRAMEWORK/MoltenVK" ]; then
+            echo "::error::Verified IPA does not contain MoltenVK.framework/MoltenVK"
+            exit 1
+          fi
+          echo "MOLTENVK_FRAMEWORK=$MOLTENVK_FRAMEWORK" >> "$GITHUB_ENV"
 
-      - name: Compile forked Swift app
+      - name: Build forked native iOS core and libslirp
+        shell: bash
+        env:
+          IOS_DEPLOYMENT_TARGET: "16.0"
+          SDK_NAME: iphoneos
+        run: |
+          set -euo pipefail
+          test -f "$MOLTENVK_ROOT/include/vulkan/vulkan.h"
+          ios/scripts/build-core-ios.sh 2>&1 \
+            | tee "$RUNNER_TEMP/dukex-core-build.log"
+
+      - name: Verify forked native core ABI and architectures
+        shell: bash
+        run: |
+          set -euo pipefail
+          CORE="$GITHUB_WORKSPACE/build-ios-arm64/libxemu-ios-core.dylib"
+          SLIRP="$GITHUB_WORKSPACE/build-ios-arm64/subprojects/slirp/libslirp.0.dylib"
+          test -f "$CORE"
+          test -f "$SLIRP"
+          test -f "$MOLTENVK_FRAMEWORK/MoltenVK"
+          xcrun lipo "$CORE" -verify_arch arm64
+          xcrun lipo "$SLIRP" -verify_arch arm64
+          xcrun lipo "$MOLTENVK_FRAMEWORK/MoltenVK" -verify_arch arm64
+          nm -gU "$CORE" | grep -E '[[:space:]]_xemu_ios_main$'
+          nm -gU "$CORE" | grep -E '[[:space:]]_xemu_ios_set_touch_controller_state$'
+          nm -gU "$CORE" | grep -E '[[:space:]]_xemu_ios_set_external_metal_layer$'
+          nm -gU "$CORE" | grep -E '[[:space:]]_xemu_ios_set_gameplay_touch_event_callback$'
+          echo "Verified fork-built arm64 core, Slirp, and required Swift bridge symbols."
+
+      - name: Compile forked Swift app and embed fork-built runtime
         shell: bash
         run: |
           set -euo pipefail
@@ -76,7 +140,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             build 2>&1 | tee "$RUNNER_TEMP/dukex-xcodebuild.log"
 
-      - name: Package unsigned test IPA
+      - name: Package unsigned native-core test IPA
         shell: bash
         run: |
           set -euo pipefail
@@ -95,23 +159,29 @@ jobs:
           (
             cd "$RUNNER_TEMP/dukex-package"
             COPYFILE_DISABLE=1 zip -q -r -X \
-              "$GITHUB_WORKSPACE/DukeX-16x9-unsigned.ipa" Payload
+              "$GITHUB_WORKSPACE/DukeX-NativeCore-unsigned.ipa" Payload
           )
-          unzip -t "$GITHUB_WORKSPACE/DukeX-16x9-unsigned.ipa" | tail -n 1
+          unzip -t "$GITHUB_WORKSPACE/DukeX-NativeCore-unsigned.ipa" | tail -n 1
 
       - name: Upload test IPA
         uses: actions/upload-artifact@v4
         with:
-          name: DukeX-16x9-unsigned-IPA
-          path: DukeX-16x9-unsigned.ipa
+          name: DukeX-NativeCore-Unsigned-IPA
+          path: DukeX-NativeCore-unsigned.ipa
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload compiler log if build fails
+      - name: Upload build diagnostics if build fails
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: DukeX-iOS-build-log
-          path: ${{ runner.temp }}/dukex-xcodebuild.log
+          name: DukeX-native-core-build-logs
+          path: |
+            ${{ runner.temp }}/dukex-core-build.log
+            ${{ runner.temp }}/dukex-xcodebuild.log
+            ${{ runner.temp }}/dukex-vcpkg/buildtrees/*/config-*-err.log
+            ${{ runner.temp }}/dukex-vcpkg/buildtrees/*/config-*-meson-log.txt.log
+            ${{ runner.temp }}/dukex-vcpkg/buildtrees/*/package-*-out.log
+            ${{ runner.temp }}/dukex-vcpkg/buildtrees/*/package-*-err.log
           if-no-files-found: ignore
           retention-days: 7

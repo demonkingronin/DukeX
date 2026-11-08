@@ -79,6 +79,7 @@ final class ManicSkinTouchControlsView: UIView {
             touchControlsActive = false
             isHidden = true
             isUserInteractionEnabled = false
+            controllerBridge.setPhysicalControllerInputEnabled(false)
             controllerBridge.setTouchControlsActive(false)
             onTouchControlsModeChanged?(false)
             notifyViewportChanged()
@@ -351,12 +352,26 @@ final class ManicSkinTouchControlsView: UIView {
             queue: .main
         ) { [weak self] notification in
             guard let self else { return }
-            if let controller = notification.object as? GCController,
-               self.controllerBridge.isManagedVirtualController(controller) {
-                return
+            if let controller = notification.object as? GCController {
+                if self.controllerBridge.isManagedVirtualController(controller) {
+                    return
+                }
+                self.controllerBridge.handlePhysicalControllerDisconnect(controller)
             }
             self.updateControllerMode(reason: "controller-disconnect")
         })
+
+        controllerObservers.append(NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateControllerMode(reason: "application-became-active")
+        })
+
+        // Reconcile once when the app becomes active. While the app is
+        // running, GameController connect/disconnect notifications drive
+        // changes directly; no periodic background polling is needed.
     }
 
     private func stopControllerObservers() {
@@ -379,12 +394,17 @@ final class ManicSkinTouchControlsView: UIView {
         isHidden = !shouldUseTouchControls
         isUserInteractionEnabled = shouldUseTouchControls
         if shouldUseTouchControls {
+            // Keep port 1 alive while handing the game back to touch.
             if modeChanged {
                 controllerBridge.setTouchControlsActive(true)
                 NSLog("Manic skin touch controls shown (%@)", reason)
             }
+            controllerBridge.setPhysicalControllerInputEnabled(false)
         } else {
             releaseAllTouches()
+            // SDL may miss mid-game hotplug. Forward physical input through
+            // the existing native Xbox controller bridge.
+            controllerBridge.setPhysicalControllerInputEnabled(true)
             if modeChanged {
                 controllerBridge.setTouchControlsActive(false)
                 NSLog("Manic skin touch controls hidden because a physical controller is connected (%@)", reason)
