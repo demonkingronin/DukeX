@@ -31,6 +31,10 @@ import re
 
 root = Path.cwd()
 configure = (root / 'configure').read_text()
+meson = (root / 'meson.build').read_text()
+for cmake_option in ("'CMAKE_SYSTEM_NAME': 'iOS'", "'CMAKE_OSX_SYSROOT': 'iphoneos'", "'CMAKE_OSX_ARCHITECTURES': 'arm64'"):
+    if cmake_option not in meson:
+        raise SystemExit(f'SDL3 iOS CMake target setting missing: {cmake_option}')
 core_build = (root / 'ios/scripts/build-core-ios.sh').read_text()
 requirements = (root / 'pythondeps.toml').read_text()
 if '[ios-build]' not in requirements or 'PyYAML' not in requirements:
