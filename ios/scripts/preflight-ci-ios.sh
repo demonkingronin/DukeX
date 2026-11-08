@@ -27,6 +27,7 @@ done
 python3 - <<'PY'
 import configparser
 import json
+import os
 from pathlib import Path
 import re
 
@@ -143,8 +144,23 @@ bootstrap = (root / 'ios/scripts/bootstrap-vcpkg-ios.sh').read_text()
 for marker in ('VCPKG_TOOL_SOURCE_SHA', 'shasum -a 512 -c -', 'cmake --build "$build_dir" --target vcpkg', 'source_urls=('):
     if marker not in bootstrap:
         raise SystemExit(f'Pinned vcpkg source bootstrap guard missing: {marker}')
+# GitHub Actions evaluates the workflow file at the triggering commit. For an
+# expressly approved one-shot build, that snapshot temporarily contains a
+# narrowly scoped push trigger even after the branch has been restored to
+# manual-only. Accept that snapshot ONLY for the matching approved run.
 if re.search(r'(?m)^  (push|pull_request|schedule):', workflow):
-    raise SystemExit('iOS IPA workflow must remain manual-only')
+    approved_branch = 'build/approved-2026-11-07-dukex'
+    approved_trigger = '\n  push:\n    branches:\n      - ' + approved_branch + '\n'
+    approved_run = (
+        workflow.count('\n  push:\n') == 1
+        and approved_trigger in workflow
+        and not re.search(r'(?m)^  (pull_request|schedule):', workflow)
+        and os.environ.get('GITHUB_EVENT_NAME') == 'push'
+        and os.environ.get('GITHUB_REF') == 'refs/heads/' + approved_branch
+        and os.environ.get('GITHUB_REPOSITORY') == 'demonkingronin/DukeX'
+    )
+    if not approved_run:
+        raise SystemExit('Unexpected automatic iOS workflow trigger; only owner-approved one-shot builds are permitted')
 print('Pinned vcpkg baseline, overlay manifests and iOS cross configuration: OK')
 PY
 
