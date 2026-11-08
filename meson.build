@@ -2454,6 +2454,16 @@ if vulkan.found()
 
   spirv_reflect_opts = cmake.subproject_options()
   spirv_reflect_opts.add_cmake_defines({'SPIRV_REFLECT_STATIC_LIB': 'ON'})
+  # Only the static library is linked into the iOS emulator. The default
+  # SPIRV-Reflect command-line tools become MACOSX_BUNDLE executables on
+  # iOS, and their upstream install(TARGETS) rules lack BUNDLE DESTINATION.
+  # Do not generate or install these unused tools on iOS.
+  if host_is_ios
+    spirv_reflect_opts.add_cmake_defines({
+      'SPIRV_REFLECT_EXECUTABLE': 'OFF',
+      'SPIRV_REFLECT_INSTALL': 'OFF',
+    })
+  endif
   spirv_reflect_subproj = cmake.subproject('SPIRV-Reflect', options: spirv_reflect_opts)
   spirv_reflect = declare_dependency(include_directories: spirv_reflect_subproj.include_directories('spirv-reflect-static'),
                                      link_with: spirv_reflect_subproj.target('spirv-reflect-static'),

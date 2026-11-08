@@ -35,6 +35,14 @@ meson = (root / 'meson.build').read_text()
 for cmake_option in ("'CMAKE_SYSTEM_NAME': 'iOS'", "'CMAKE_OSX_SYSROOT': 'iphoneos'", "'CMAKE_OSX_ARCHITECTURES': 'arm64'"):
     if cmake_option not in meson:
         raise SystemExit(f'SDL3 iOS CMake target setting missing: {cmake_option}')
+# SPIRV-Reflect's optional command-line executables have no iOS bundle
+# install destination; only its static library is needed by DukeX.
+spirv_options = meson.split("  spirv_reflect_opts = cmake.subproject_options()", 1)[1].split("  spirv_reflect_subproj =", 1)[0]
+for required_option in ("'SPIRV_REFLECT_STATIC_LIB': 'ON'", "'SPIRV_REFLECT_EXECUTABLE': 'OFF'", "'SPIRV_REFLECT_INSTALL': 'OFF'"):
+    if required_option not in spirv_options:
+        raise SystemExit(f'SPIRV-Reflect iOS CMake option missing: {required_option}')
+if 'if host_is_ios' not in spirv_options:
+    raise SystemExit('SPIRV-Reflect tool exclusions must remain iOS-only')
 # The Meson-generated CMake toolchain overrides command-line platform options.
 # Check the cross-file override before installing expensive native dependencies.
 for cmake_machine_setting in ("CMAKE_SYSTEM_NAME = 'iOS'", "CMAKE_OSX_SYSROOT = 'iphoneos'", "CMAKE_OSX_ARCHITECTURES = 'arm64'"):
