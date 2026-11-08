@@ -11,6 +11,7 @@ for required in \
   ios/vcpkg-triplets/meson-ios-cross.txt \
   ios/vcpkg-overlays/libpcap/portfile.cmake \
   ios/DukeX/DukeX.xcodeproj/project.pbxproj \
+  ios/scripts/bootstrap-vcpkg-ios.sh \
   ios/scripts/build-core-ios.sh \
   ios/scripts/embed-core-ios.sh; do
   if [[ ! -f "$required" ]]; then
@@ -136,6 +137,14 @@ if 'if(VCPKG_TARGET_IS_IOS)' not in libpcap_port or '"-DPCAP_TYPE=null"' not in 
 workflow = (root / '.github/workflows/ios-unsigned-ipa.yml').read_text()
 if f'git -C "$VCPKG_ROOT" checkout {baseline}' not in workflow:
     raise SystemExit('Workflow vcpkg revision differs from ios/vcpkg.json')
+if 'bash ios/scripts/bootstrap-vcpkg-ios.sh "$VCPKG_ROOT"' not in workflow:
+    raise SystemExit('Workflow must invoke the pinned vcpkg source fallback')
+bootstrap = (root / 'ios/scripts/bootstrap-vcpkg-ios.sh').read_text()
+for marker in ('VCPKG_TOOL_SOURCE_SHA', 'shasum -a 512 -c -', 'cmake --build "$build_dir" --target vcpkg', 'source_urls=('):
+    if marker not in bootstrap:
+        raise SystemExit(f'Pinned vcpkg source bootstrap guard missing: {marker}')
+if re.search(r'(?m)^  (push|pull_request|schedule):', workflow):
+    raise SystemExit('iOS IPA workflow must remain manual-only')
 print('Pinned vcpkg baseline, overlay manifests and iOS cross configuration: OK')
 PY
 
