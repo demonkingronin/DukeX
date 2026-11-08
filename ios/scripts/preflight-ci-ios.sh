@@ -9,6 +9,7 @@ for required in \
   ios/vcpkg.json \
   ios/vcpkg-triplets/arm64-ios.cmake \
   ios/vcpkg-triplets/meson-ios-cross.txt \
+  ios/vcpkg-overlays/libpcap/portfile.cmake \
   ios/DukeX/DukeX.xcodeproj/project.pbxproj \
   ios/scripts/build-core-ios.sh \
   ios/scripts/embed-core-ios.sh; do
@@ -49,6 +50,10 @@ if not cross.read(root / 'ios/vcpkg-triplets/meson-ios-cross.txt'):
     raise SystemExit('Missing Meson cross file')
 if not cross.has_section('properties') or not cross.getboolean('properties', 'needs_exe_wrapper', fallback=False):
     raise SystemExit('iOS Meson cross file must set needs_exe_wrapper=true')
+
+libpcap_port = (root / 'ios/vcpkg-overlays/libpcap/portfile.cmake').read_text()
+if 'if(VCPKG_TARGET_IS_IOS)' not in libpcap_port or '"-DPCAP_TYPE=null"' not in libpcap_port:
+    raise SystemExit('iOS libpcap overlay must use the supported null capture backend')
 
 workflow = (root / '.github/workflows/ios-unsigned-ipa.yml').read_text()
 if f'git -C "$VCPKG_ROOT" checkout {baseline}' not in workflow:

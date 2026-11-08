@@ -4,6 +4,7 @@ name: Build DukeX iOS (unsigned IPA)
 # queue this workflow; run only after the owner explicitly approves.
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
