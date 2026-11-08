@@ -1,10 +1,9 @@
 name: Build DukeX iOS (unsigned IPA)
 
+# Manual-only. A commit, pull request, or branch update must never
+# queue this workflow; run only after the owner explicitly approves.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - build/ios-unsigned-ipa
 
 permissions:
   contents: read
@@ -15,7 +14,7 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 120
     env:
-      VCPKG_ROOT: \${{ runner.temp }}/dukex-vcpkg
+      VCPKG_ROOT: ${{ runner.temp }}/dukex-vcpkg
       IPHONEOS_DEPLOYMENT_TARGET: "16.0"
       SDK_NAME: iphoneos
     steps:
@@ -48,9 +47,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: |
-            \${{ runner.temp }}/dukex-vcpkg/installed
-            \${{ runner.temp }}/dukex-vcpkg/downloads
-          key: \${{ runner.os }}-dukex-ios-vcpkg-2026.10.16-\${{ hashFiles('ios/vcpkg.json', 'ios/vcpkg-triplets/**', 'ios/vcpkg-overlays/**') }}
+            ${{ runner.temp }}/dukex-vcpkg/installed
+            ${{ runner.temp }}/dukex-vcpkg/downloads
+          key: ${{ runner.os }}-dukex-ios-vcpkg-2026.10.16-${{ hashFiles('ios/vcpkg.json', 'ios/vcpkg-triplets/**', 'ios/vcpkg-overlays/**') }}
 
       - name: Install pinned arm64 iOS native dependencies
         shell: bash
@@ -172,7 +171,7 @@ jobs:
         with:
           name: DukeX-native-core-build-logs
           path: |
-            \${{ runner.temp }}/dukex-core-build.log
-            \${{ runner.temp }}/dukex-xcodebuild.log
+            ${{ runner.temp }}/dukex-core-build.log
+            ${{ runner.temp }}/dukex-xcodebuild.log
           if-no-files-found: ignore
           retention-days: 7
