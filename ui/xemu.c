@@ -1932,6 +1932,24 @@ static void display_finalize(void)
     }
 #endif
     SDL_DestroyWindow(m_window);
+    m_window = NULL;
+    m_context = NULL;
+
+    // qemu_cleanup() destroys the emulated consoles before this display
+    // teardown. Release the display driver's separately allocated keyboard
+    // trackers and console array so returning to the iOS library doesn't leak
+    // one set per game session.
+    if (scon_list) {
+        for (int i = 0; i < num_outputs; i++) {
+            if (scon_list[i].kbd) {
+                qkbd_state_free(scon_list[i].kbd);
+                scon_list[i].kbd = NULL;
+            }
+        }
+        g_free(scon_list);
+        scon_list = NULL;
+    }
+    num_outputs = 0;
     SDL_Quit();
 }
 
@@ -2281,6 +2299,8 @@ int main(int argc, char **argv)
     IOS_LOG("settings saved after core session");
 #endif
     display_finalize();
+    qemu_sem_destroy(&display_init_sem);
+    qemu_sem_destroy(&display_shutdown_sem);
     IOS_LOG("xemu_ios_main returning %d", exit_status);
     return exit_status;
 }
