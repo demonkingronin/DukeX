@@ -44,6 +44,25 @@ static char *settings_path;
 static bool settings_path_owned = false;
 static std::string error_msg;
 
+#ifdef CONFIG_IOS
+static bool s_ios_settings_loaded;
+
+/* genconfig's reset_to_defaults() does not clear arrays. On iOS the core
+ * is re-entered for each game, so clear previous game-specific arrays too. */
+static void xemu_ios_reset_config_node(CNode &node)
+{
+    if (node.type == Array) {
+        node.children.clear();
+    } else if (node.type == Table) {
+        for (auto &child : node.children) {
+            xemu_ios_reset_config_node(child);
+        }
+    } else {
+        node.reset_to_defaults();
+    }
+}
+#endif
+
 const char *xemu_settings_get_error_message(void)
 {
     return error_msg.length() ? error_msg.c_str() : NULL;
@@ -168,6 +187,16 @@ static const char *read_file(FILE *fd)
 bool xemu_settings_load(void)
 {
     error_msg.clear();
+#ifdef CONFIG_IOS
+    if (s_ios_settings_loaded) {
+        /* The previous QEMU session and presenter have finished. Free the
+         * previous TOML-backed structure before loading a different game.
+         * Otherwise missing keys inherit stale values and strings leak. */
+        config_tree.free_allocations(&g_config);
+        xemu_ios_reset_config_node(config_tree);
+    }
+    s_ios_settings_loaded = true;
+#endif
     const char *settings_path = xemu_settings_get_path();
     bool success = false;
 

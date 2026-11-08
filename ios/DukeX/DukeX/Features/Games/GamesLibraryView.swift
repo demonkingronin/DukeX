@@ -187,6 +187,7 @@ struct GamesLibraryView: View {
                                 liveStatus: liveStatusStore.status(for: game),
                                 isFavorite: isFavorite(game),
                                 resolutionScale: store.resolutionScale(for: game),
+                                skipBoot: store.skipBoot(for: game),
                                 launch: {
                                     markRecentlyPlayed(game)
                                     launchGame(game)
@@ -195,6 +196,7 @@ struct GamesLibraryView: View {
                                 copyLaunchLink: { copyLaunchLink(game) },
                                 importConfig: { importConfig(game) },
                                 setResolutionScale: { setResolutionScale($0, for: game) },
+                                setSkipBoot: { setSkipBoot($0, for: game) },
                                 clearShaderCache: { clearShaderCache(game) },
                                 editGameData: { editGameData(game) },
                                 toggleFavorite: { toggleFavorite(game) },
@@ -218,6 +220,7 @@ struct GamesLibraryView: View {
                                 liveStatus: liveStatusStore.status(for: game),
                                 isFavorite: isFavorite(game),
                                 resolutionScale: store.resolutionScale(for: game),
+                                skipBoot: store.skipBoot(for: game),
                                 launch: {
                                     markRecentlyPlayed(game)
                                     launchGame(game)
@@ -226,6 +229,7 @@ struct GamesLibraryView: View {
                                 copyLaunchLink: { copyLaunchLink(game) },
                                 importConfig: { importConfig(game) },
                                 setResolutionScale: { setResolutionScale($0, for: game) },
+                                setSkipBoot: { setSkipBoot($0, for: game) },
                                 clearShaderCache: { clearShaderCache(game) },
                                 toggleFavorite: { toggleFavorite(game) },
                                 requestRemoveGame: { requestRemoveGame(game) }
@@ -264,6 +268,7 @@ struct GamesLibraryView: View {
                                     liveStatus: liveStatusStore.status(for: game),
                                     isFavorite: isFavorite(game),
                                     resolutionScale: store.resolutionScale(for: game),
+                                    skipBoot: store.skipBoot(for: game),
                                     isHighlighted: game.id == controllerLandscapeSelectedGameID,
                                     presentation: .controllerLandscapePage,
                                     launch: {
@@ -275,6 +280,7 @@ struct GamesLibraryView: View {
                                     copyLaunchLink: { copyLaunchLink(game) },
                                     importConfig: { importConfig(game) },
                                     setResolutionScale: { setResolutionScale($0, for: game) },
+                                    setSkipBoot: { setSkipBoot($0, for: game) },
                                     clearShaderCache: { clearShaderCache(game) },
                                     toggleFavorite: { toggleFavorite(game) },
                                     requestRemoveGame: { requestRemoveGame(game) }
@@ -720,6 +726,18 @@ struct GamesLibraryView: View {
         } catch {
             store.message = UserMessage(
                 title: "Display Quality Not Updated",
+                detail: error.localizedDescription
+            )
+        }
+    }
+
+    private func setSkipBoot(_ enabled: Bool, for game: LibraryFile) {
+        guard store.skipBoot(for: game) != enabled else { return }
+        do {
+            try store.setSkipBoot(enabled, for: game)
+        } catch {
+            store.message = UserMessage(
+                title: "Skip Boot Not Updated",
                 detail: error.localizedDescription
             )
         }

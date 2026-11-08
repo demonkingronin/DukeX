@@ -2136,6 +2136,12 @@ int main(int argc, char **argv)
 {
     QemuThread thread;
 
+#ifdef CONFIG_IOS
+    /* The iOS core is a reusable dylib. Reset the previous session's exit
+     * flag before starting its QEMU worker and SDL render loop again. */
+    qatomic_set(&qemu_exiting, false);
+    exit_status = EXIT_SUCCESS;
+#endif
     setlocale(LC_NUMERIC, "C");
 
 #ifdef CONFIG_IOS

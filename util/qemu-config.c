@@ -10,6 +10,27 @@
 QemuOptsList *vm_config_groups[48];
 QemuOptsList *drive_config_groups[5];
 
+#ifdef CONFIG_IOS
+/*
+ * QEMU is an in-process dylib on iOS. The next game re-enters qemu_init()
+ * after qemu_cleanup() and display teardown, so discard options parsed for
+ * the previous game while keeping the registered group pointers. Some
+ * dynamically registered groups are initialized only once per process.
+ */
+void qemu_config_prepare_for_relaunch(void)
+{
+    size_t i;
+
+    for (i = 0; i < ARRAY_SIZE(vm_config_groups) && vm_config_groups[i]; i++) {
+        qemu_opts_reset(vm_config_groups[i]);
+    }
+    for (i = 0; i < ARRAY_SIZE(drive_config_groups) &&
+                drive_config_groups[i]; i++) {
+        qemu_opts_reset(drive_config_groups[i]);
+    }
+}
+#endif
+
 static QemuOptsList *find_list(QemuOptsList **lists, const char *group,
                                Error **errp)
 {
@@ -64,6 +85,14 @@ void qemu_add_drive_opts(QemuOptsList *list)
 
     entries = ARRAY_SIZE(drive_config_groups);
     entries--; /* keep list NULL terminated */
+#ifdef CONFIG_IOS
+    /* The same static drive groups are re-registered on every iOS launch. */
+    for (i = 0; i < entries; i++) {
+        if (drive_config_groups[i] == list) {
+            return;
+        }
+    }
+#endif
     for (i = 0; i < entries; i++) {
         if (drive_config_groups[i] == NULL) {
             drive_config_groups[i] = list;
@@ -80,6 +109,14 @@ void qemu_add_opts(QemuOptsList *list)
 
     entries = ARRAY_SIZE(vm_config_groups);
     entries--; /* keep list NULL terminated */
+#ifdef CONFIG_IOS
+    /* Retain module group registrations but do not consume duplicate slots. */
+    for (i = 0; i < entries; i++) {
+        if (vm_config_groups[i] == list) {
+            return;
+        }
+    }
+#endif
     for (i = 0; i < entries; i++) {
         if (vm_config_groups[i] == NULL) {
             vm_config_groups[i] = list;
