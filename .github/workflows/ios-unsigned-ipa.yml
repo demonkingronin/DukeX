@@ -5,6 +5,9 @@ name: Build DukeX iOS (unsigned IPA)
 on:
   workflow_dispatch:
   workflow_call:
+  push:
+    branches:
+      - build/approved-2026-11-07-dukex
 
 permissions:
   contents: read
