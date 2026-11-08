@@ -1,13 +1,9 @@
 name: Build DukeX iOS (unsigned IPA)
 
-# Approved single-use DukeX Build 16 trigger; restored to manual-only after run registered.
+# Manual-only. A commit, pull request, or branch update must never
+# queue this workflow; run only after the owner explicitly approves.
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - build/approved-2026-11-07-dukex
-    paths:
-      - .github/workflows/ios-unsigned-ipa.yml
 
 permissions:
   contents: read
