@@ -13,9 +13,6 @@ jobs:
     name: Build forked native core and package unsigned IPA
     runs-on: macos-26
     timeout-minutes: 120
-    env:
-      IPHONEOS_DEPLOYMENT_TARGET: "16.0"
-      SDK_NAME: iphoneos
     steps:
       - name: Checkout DukeX source
         uses: actions/checkout@v4
@@ -94,6 +91,9 @@ jobs:
 
       - name: Build forked native iOS core and libslirp
         shell: bash
+        env:
+          IOS_DEPLOYMENT_TARGET: "16.0"
+          SDK_NAME: iphoneos
         run: |
           set -euo pipefail
           test -f "$MOLTENVK_ROOT/include/vulkan/vulkan.h"
