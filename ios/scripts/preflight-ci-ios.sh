@@ -12,6 +12,7 @@ for required in \
   ios/vcpkg-overlays/libpcap/portfile.cmake \
   ios/DukeX/DukeX.xcodeproj/project.pbxproj \
   ios/scripts/bootstrap-vcpkg-ios.sh \
+  ios/scripts/build-moltenvk-ios.sh \
   ios/scripts/build-core-ios.sh \
   ios/scripts/embed-core-ios.sh; do
   if [[ ! -f "$required" ]]; then
@@ -140,6 +141,18 @@ if f'git -C "$VCPKG_ROOT" checkout {baseline}' not in workflow:
     raise SystemExit('Workflow vcpkg revision differs from ios/vcpkg.json')
 if 'bash ios/scripts/bootstrap-vcpkg-ios.sh "$VCPKG_ROOT"' not in workflow:
     raise SystemExit('Workflow must invoke the pinned vcpkg source fallback')
+mvk_source = (root / 'ios/scripts/build-moltenvk-ios.sh').read_text()
+for required in ('db66022459ffb663aa2b50f6b018bc2e124f5edf',
+                 './fetchDependencies --ios', 'make ios',
+                 'SupportedPlatform', 'CFBundleSupportedPlatforms', 'verify_framework'):
+    if required not in mvk_source:
+        raise SystemExit(f'Pinned MoltenVK source build guard missing: {required}')
+for required in ('bash ios/scripts/build-moltenvk-ios.sh',
+                 'actions/cache/save@v4', 'MOLTENVK_FRAMEWORK'):
+    if required not in workflow:
+        raise SystemExit(f'MoltenVK build integration is missing: {required}')
+if 'ORIGINAL_IPA:' in workflow:
+    raise SystemExit('Do not download an unrelated IPA for MoltenVK')
 bootstrap = (root / 'ios/scripts/bootstrap-vcpkg-ios.sh').read_text()
 for marker in ('VCPKG_TOOL_SOURCE_SHA', 'shasum -a 512 -c -', 'cmake --build "$build_dir" --target vcpkg', 'source_urls=('):
     if marker not in bootstrap:
