@@ -37,6 +37,8 @@ if '[ios-build]' not in requirements or 'PyYAML' not in requirements:
     raise SystemExit('PyYAML must be declared for iOS QEMU venv')
 if 'mkvenv.py" ensuregroup --online' not in core_build or "-c 'import yaml;" not in core_build:
     raise SystemExit('iOS core build must install and verify PyYAML in the QEMU virtual environment')
+if 'ensuregroup --online ' + chr(92) + '\n' not in core_build:
+    raise SystemExit('iOS PyYAML install command must have a single shell continuation')
 if configure.count('cmake = [$(meson_quote "$DUKEX_IOS_CMAKE")]') != 2:
     raise SystemExit('QEMU configure must pass host CMake in both Meson machine files')
 if 'export DUKEX_IOS_CMAKE' not in core_build:
