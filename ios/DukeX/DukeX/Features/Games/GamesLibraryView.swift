@@ -186,6 +186,7 @@ struct GamesLibraryView: View {
                                 canLaunch: store.systemFilesReady && runtimeState.canLaunch,
                                 liveStatus: liveStatusStore.status(for: game),
                                 isFavorite: isFavorite(game),
+                                resolutionScale: store.resolutionScale(for: game),
                                 launch: {
                                     markRecentlyPlayed(game)
                                     launchGame(game)
@@ -193,6 +194,7 @@ struct GamesLibraryView: View {
                                 addCover: { addCover(game) },
                                 copyLaunchLink: { copyLaunchLink(game) },
                                 importConfig: { importConfig(game) },
+                                setResolutionScale: { setResolutionScale($0, for: game) },
                                 clearShaderCache: { clearShaderCache(game) },
                                 editGameData: { editGameData(game) },
                                 toggleFavorite: { toggleFavorite(game) },
@@ -215,6 +217,7 @@ struct GamesLibraryView: View {
                                 canLaunch: store.systemFilesReady && runtimeState.canLaunch,
                                 liveStatus: liveStatusStore.status(for: game),
                                 isFavorite: isFavorite(game),
+                                resolutionScale: store.resolutionScale(for: game),
                                 launch: {
                                     markRecentlyPlayed(game)
                                     launchGame(game)
@@ -222,6 +225,7 @@ struct GamesLibraryView: View {
                                 addCover: { addCover(game) },
                                 copyLaunchLink: { copyLaunchLink(game) },
                                 importConfig: { importConfig(game) },
+                                setResolutionScale: { setResolutionScale($0, for: game) },
                                 clearShaderCache: { clearShaderCache(game) },
                                 toggleFavorite: { toggleFavorite(game) },
                                 requestRemoveGame: { requestRemoveGame(game) }
@@ -259,6 +263,7 @@ struct GamesLibraryView: View {
                                     canLaunch: store.systemFilesReady && runtimeState.canLaunch,
                                     liveStatus: liveStatusStore.status(for: game),
                                     isFavorite: isFavorite(game),
+                                    resolutionScale: store.resolutionScale(for: game),
                                     isHighlighted: game.id == controllerLandscapeSelectedGameID,
                                     presentation: .controllerLandscapePage,
                                     launch: {
@@ -269,6 +274,7 @@ struct GamesLibraryView: View {
                                     addCover: { addCover(game) },
                                     copyLaunchLink: { copyLaunchLink(game) },
                                     importConfig: { importConfig(game) },
+                                    setResolutionScale: { setResolutionScale($0, for: game) },
                                     clearShaderCache: { clearShaderCache(game) },
                                     toggleFavorite: { toggleFavorite(game) },
                                     requestRemoveGame: { requestRemoveGame(game) }
@@ -703,6 +709,20 @@ struct GamesLibraryView: View {
 
     private func isFavorite(_ game: LibraryFile) -> Bool {
         favoriteGameKeys.contains(GameLibraryFavorites.key(for: game))
+    }
+
+    // Editing display quality is an explicit menu action, never a background task.
+    // Only the selected game's TOML surface_scale value is updated.
+    private func setResolutionScale(_ scale: Int, for game: LibraryFile) {
+        guard store.resolutionScale(for: game) != scale else { return }
+        do {
+            try store.setResolutionScale(scale, for: game)
+        } catch {
+            store.message = UserMessage(
+                title: "Display Quality Not Updated",
+                detail: error.localizedDescription
+            )
+        }
     }
 
     private func toggleFavorite(_ game: LibraryFile) {

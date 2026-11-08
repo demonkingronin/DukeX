@@ -11,10 +11,12 @@ struct GameListRow: View {
     let canLaunch: Bool
     let liveStatus: GameLiveStatus?
     let isFavorite: Bool
+    let resolutionScale: Int
     let launch: () -> Void
     let addCover: () -> Void
     let copyLaunchLink: () -> Void
     let importConfig: () -> Void
+    let setResolutionScale: (Int) -> Void
     let clearShaderCache: () -> Void
     let editGameData: () -> Void
     let toggleFavorite: () -> Void
@@ -219,6 +221,23 @@ struct GameListRow: View {
         Button(action: importConfig) {
             Label(game.customConfigURL == nil ? "Import Config" : "Replace Config",
                   systemImage: "gearshape")
+        }
+
+        Menu {
+            ForEach(GameResolutionScaleConfig.allowedValues, id: \.self) { scale in
+                Button {
+                    setResolutionScale(scale)
+                } label: {
+                    if resolutionScale == scale {
+                        Label("\(scale)×", systemImage: "checkmark")
+                    } else {
+                        Text("\(scale)×")
+                    }
+                }
+                .disabled(resolutionScale == scale)
+            }
+        } label: {
+            Label("Display Quality (\(resolutionScale)×)", systemImage: "display")
         }
 
         Button(action: clearShaderCache) {
